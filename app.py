@@ -322,8 +322,9 @@ def _cached_answer_outs():
 
 
 # ───────────────────────── 📈 개선 기록 ─────────────────────────
-LOG_DISPLAY_COLUMNS = ["회차", "변경 대상", "바뀐 이유", "바뀐 내용",
-                       "정확도", "Macro F1", "범위밖 인식률", "답변 통과율", "결과 메모"]
+LOG_DISPLAY_COLUMNS = ["회차", "변경 대상", "변경 이유(Why)", "변경내용(What)",
+                       "의도 분류 정확도", "답변 통과율", "성과 및 오답 메모"]
+EVAL_N, OUTSCOPE_N, ANSWER_N = 60, 20, 16  # 각 평가셋의 고정 문항 수(evaluate.py 기준)
 
 
 def _load_log():
@@ -351,6 +352,38 @@ def _safe_str(v):
     return "-" if v is None or (isinstance(v, float) and pd.isna(v)) or v == "" else str(v)
 
 
+def _fmt_router_cell(acc, f1, prev_acc):
+    """정확도(직전 회차 대비 증감) + macro F1 점수를 한 칸에 담는다."""
+    if pd.isna(acc):
+        return "-"
+    acc_disp = _fmt_metric(acc, prev_acc, pct=True)
+    f1_disp = f"F1 {f1:.3f}" if not pd.isna(f1) else "F1 -"
+    return f"{acc_disp} · {f1_disp}"
+
+
+def _fmt_answer_cell(rate, prev_rate):
+    """통과율(직전 회차 대비 증감) + 통과 건수를 한 칸에 담는다."""
+    if pd.isna(rate):
+        return "-"
+    rate_disp = _fmt_metric(rate, prev_rate, pct=True)
+    n_pass = round(rate * ANSWER_N)
+    return f"{rate_disp} · {n_pass}/{ANSWER_N}건"
+
+
+def _fmt_memo_cell(acc, outscope_recall, memo):
+    """오분류 건수·범위밖 인식 건수를 자동 계산해 메모(답변 탈락 사유 요약 등) 앞에 붙인다."""
+    parts = []
+    if not pd.isna(acc):
+        parts.append(f"오분류 {round((1 - acc) * EVAL_N)}건")
+    if not pd.isna(outscope_recall):
+        parts.append(f"범위밖 인식 {round(outscope_recall * OUTSCOPE_N)}/{OUTSCOPE_N}건({100 * outscope_recall:.1f}%)")
+    prefix = " · ".join(parts)
+    memo_text = _safe_str(memo)
+    if prefix and memo_text != "-":
+        return f"{prefix} — {memo_text}"
+    return prefix or memo_text
+
+
 def _log_display_df(log):
     """CSV 원본(숫자 그대로)을 사람이 바로 읽을 수 있는 표로 바꾼다 — 컬럼명을 한글로, 지표는 직전 회차 대비 증감을 같이 표시."""
     if log.empty:
@@ -359,16 +392,16 @@ def _log_display_df(log):
     for i in range(len(log)):
         r = log.iloc[i]
         prev = log.iloc[i - 1] if i > 0 else None
+        prev_acc = prev["router_acc"] if prev is not None else None
+        prev_rate = prev["answer_pass_rate"] if prev is not None else None
         rows.append({
             "회차": int(r["round"]),
             "변경 대상": _safe_str(r.get("change_target")),
-            "바뀐 이유": _safe_str(r.get("change_reason")),
-            "바뀐 내용": _safe_str(r.get("change_detail")),
-            "정확도": _fmt_metric(r["router_acc"], prev["router_acc"] if prev is not None else None, pct=True),
-            "Macro F1": _fmt_metric(r["router_macro_f1"], prev["router_macro_f1"] if prev is not None else None, pct=False),
-            "범위밖 인식률": _fmt_metric(r["outscope_recall"], prev["outscope_recall"] if prev is not None else None, pct=True),
-            "답변 통과율": _fmt_metric(r["answer_pass_rate"], prev["answer_pass_rate"] if prev is not None else None, pct=True),
-            "결과 메모": _safe_str(r.get("memo")),
+            "변경 이유(Why)": _safe_str(r.get("change_reason")),
+            "변경내용(What)": _safe_str(r.get("change_detail")),
+            "의도 분류 정확도": _fmt_router_cell(r["router_acc"], r["router_macro_f1"], prev_acc),
+            "답변 통과율": _fmt_answer_cell(r["answer_pass_rate"], prev_rate),
+            "성과 및 오답 메모": _fmt_memo_cell(r["router_acc"], r["outscope_recall"], r.get("memo")),
         })
     return pd.DataFrame(rows, columns=LOG_DISPLAY_COLUMNS)
 
@@ -527,15 +560,25 @@ with gr.Blocks(title="대학교 학사 안내 에이전트") as demo:
 
         with gr.Tab("📈 개선 기록"):
             gr.Markdown(
-                "### 종합 실험 기록표\n"
+                "### 1. 종합 실험 기록표\n"
                 "무엇을 왜 바꿨고 수치가 어떻게 움직였는지 회차별로 남긴 기록입니다. "
-                "원칙: 평가셋은 프롬프트에 넣지 않기 · 한 번에 하나만 바꾸기 · 바뀐 것과 숫자를 같이 기록하기.\n\n"
                 "회차는 성능 벤치마크 탭에서 측정한 뒤 여기에 추가되며, 이 탭 자체에는 입력칸이 없습니다."
             )
             refresh_btn = gr.Button("표 새로고침")
-            log_table = gr.Dataframe(value=_log_display_df(_load_log()), wrap=True, buttons=[], elem_classes="fit-table")
+            log_table = gr.Dataframe(value=_log_display_df(_load_log()), wrap=True, buttons=[], elem_classes="fit-table",
+                                      column_widths=["6%", "14%", "18%", "18%", "16%", "14%", "14%"])
 
             refresh_btn.click(refresh_log, outputs=log_table)
+
+            gr.Markdown(
+                "### 2. 실험 목표\n"
+                "① 의도 분류 정확도·macro F1, ② 범위밖 인식률, ③ 1턴 답변 통과율 — 세 지표를 함께 끌어올리되, "
+                "하나가 좋아지는 대신 다른 하나가 나빠지는 트레이드오프를 놓치지 않는 것이 목표입니다.\n\n"
+                "**실험 원칙**\n"
+                "1. 평가셋은 프롬프트에 넣지 않는다 — fewshot 문항만 예시로 쓰고, eval·outscope 문항은 채점 전용으로만 쓴다\n"
+                "2. 한 번에 하나만 바꾼다 — 여러 변경을 묶어서 재보면 어느 변경이 효과를 냈는지 알 수 없다\n"
+                "3. 바뀐 것과 숫자를 같이 기록한다 — 무엇을·왜 바꿨는지와 세 지표가 어떻게 움직였는지를 한 회차로 남긴다"
+            )
 
         with gr.Tab("📋 라우트 및 업무 규정"):
             gr.Markdown(
