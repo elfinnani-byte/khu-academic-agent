@@ -76,11 +76,12 @@ def eval_router(report=True, sample=None):
         print(f"\n[범위밖 인식률] outscope n={len(outscope)}  OTHER로 정확히 분류 {os_recall:.3f}")
         result["outscope_recall"] = os_recall
         if report:
-            os_miss = [q for q, p in zip(outscope["question"], os_pred) if p != "OTHER"]
+            os_miss = [{"question": q, "gold": "OTHER", "pred": p, "confidence": s["confidence"]}
+                       for q, p, s in zip(outscope["question"], os_pred, os_states) if p != "OTHER"]
             if os_miss:
                 print(f"[범위밖 오분류 {len(os_miss)}건]")
-                for q in os_miss:
-                    print(f"  {q[:60]}")
+                for m in os_miss:
+                    print(f"  [OTHER -> {m['pred']}] conf={m['confidence']:.2f}  {m['question'][:56]}")
             result["outscope_misclassified"] = os_miss
 
     return result
