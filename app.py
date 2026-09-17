@@ -413,12 +413,15 @@ with gr.Blocks(title="대학교 학사 안내 에이전트") as demo:
             router_stats_out = gr.HTML(_router_init[1])
             router_banner_out = gr.HTML(_router_init[2])
             with gr.Accordion("라우트별 세부 성능표 · 혼동 행렬 · 오분류 목록 자세히 보기", open=False):
-                gr.Markdown("**라우트별 세부 성능 평가표 (Classification Report)**")
-                cls_out = gr.Dataframe(value=_router_init[3])
-                gr.Markdown("**혼동 행렬 (Confusion Matrix)** — 대각선이 아닌 칸은 오분류된 건수")
-                cm_out = gr.Dataframe(value=_router_init[4])
-                gr.Markdown("**오분류 목록**")
-                miss_out = gr.Dataframe(value=_router_init[5])
+                with gr.Group():
+                    gr.Markdown("**라우트별 세부 성능 평가표 (Classification Report)**")
+                    cls_out = gr.Dataframe(value=_router_init[3])
+                with gr.Group():
+                    gr.Markdown("**혼동 행렬 (Confusion Matrix)** — 대각선이 아닌 칸은 오분류된 건수")
+                    cm_out = gr.Dataframe(value=_router_init[4])
+                with gr.Group():
+                    gr.Markdown("**오분류 목록**")
+                    miss_out = gr.Dataframe(value=_router_init[5])
 
             gr.Markdown("#### ② 1턴 답변 결과")
             _answer_init = _cached_answer_outs()
