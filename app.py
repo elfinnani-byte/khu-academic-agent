@@ -40,6 +40,8 @@ def _split_policy_sections(text):
 
 _POLICY_PREAMBLE, _POLICY_SECTIONS = _split_policy_sections(_POLICY_DOC_TEXT)
 
+EVAL_N, OUTSCOPE_N, ANSWER_N = 60, 20, 16  # 각 평가셋의 고정 문항 수(evaluate.py 기준)
+
 ROUTE_LABEL = {
     "ENROLL_REG": "📘 수강·등록",
     "ACADEMIC_STATUS": "🪪 학적",
@@ -269,8 +271,14 @@ def _render_router(r):
     cls_df = _cls_report_df(r["classification_report"], LABELS4)
     cm_df = _cm_df(r["confusion_matrix"], LABELS4, r.get("cm_col_labels", ROUTES))
     miss_df = _miss_df(miss)
-    outscope_miss_df = _miss_df(r.get("outscope_misclassified", []) or [])
-    return stats_html, banner_html, cls_df, cm_df, miss_df, outscope_miss_df
+    outscope_miss = r.get("outscope_misclassified", []) or []
+    outscope_miss_df = _miss_df(outscope_miss)
+    miss_caption = (f"**오분류 목록 ({n_miss}/{n})** — 4개 카테고리 사이에서 헷갈린 경우"
+                     "(정답 라우트가 있는데 다른 라우트로 예측)")
+    outscope_caption = (f"**범위밖 오분류 목록 ({len(outscope_miss)}/{OUTSCOPE_N})** — 원래 OTHER(범위밖)로 "
+                         "분류돼야 할 질문인데 엉뚱한 카테고리로 예측한 경우(gold는 항상 OTHER). "
+                         "범위밖 인식률이 100%가 아닌 이유가 여기 있습니다.")
+    return stats_html, banner_html, cls_df, cm_df, miss_df, outscope_miss_df, miss_caption, outscope_caption
 
 
 def run_router_bench():
@@ -309,7 +317,8 @@ def _cached_router_outs():
     if not cached:
         empty_cls = pd.DataFrame(columns=["라우트", "정밀도(Precision)", "재현율(Recall)", "F1-Score", "평가 건수", "판정"])
         empty_miss = pd.DataFrame(columns=_MISS_COLUMNS)
-        return (_ts_caption("router"), "", "", empty_cls, pd.DataFrame(), empty_miss, empty_miss)
+        return (_ts_caption("router"), "", "", empty_cls, pd.DataFrame(), empty_miss, empty_miss,
+                "**오분류 목록**", "**범위밖 오분류 목록**")
     return (_ts_caption("router"), *_render_router(cached["result"]))
 
 
@@ -324,7 +333,6 @@ def _cached_answer_outs():
 # ───────────────────────── 📈 개선 기록 ─────────────────────────
 LOG_DISPLAY_COLUMNS = ["회차", "변경 대상", "변경 이유(Why)", "변경내용(What)",
                        "의도 분류 정확도", "답변 통과율", "성과 및 오답 메모"]
-EVAL_N, OUTSCOPE_N, ANSWER_N = 60, 20, 16  # 각 평가셋의 고정 문항 수(evaluate.py 기준)
 
 
 def _load_log():
@@ -531,14 +539,11 @@ with gr.Blocks(title="대학교 학사 안내 에이전트") as demo:
                                            column_widths=_table_col_widths(_router_init[4]),
                                            elem_classes="fit-table")
                 with gr.Group():
-                    gr.Markdown("**오분류 목록** — 4개 카테고리 사이에서 헷갈린 경우(정답 라우트가 있는데 다른 라우트로 예측)")
+                    miss_caption_out = gr.Markdown(_router_init[7])
                     miss_out = gr.Dataframe(value=_router_init[5], buttons=[], wrap=True, elem_classes="fit-table",
                                              column_widths=["52%", "16%", "16%", "16%"])
                 with gr.Group():
-                    gr.Markdown(
-                        "**범위밖 오분류 목록** — 원래 OTHER(범위밖)로 분류돼야 할 질문인데 엉뚱한 카테고리로 "
-                        "예측한 경우(gold는 항상 OTHER). 범위밖 인식률이 100%가 아닌 이유가 여기 있습니다."
-                    )
+                    outscope_caption_out = gr.Markdown(_router_init[8])
                     outscope_miss_out = gr.Dataframe(value=_router_init[6], buttons=[], wrap=True,
                                                       elem_classes="fit-table",
                                                       column_widths=["52%", "16%", "16%", "16%"])
@@ -551,7 +556,7 @@ with gr.Blocks(title="대학교 학사 안내 에이전트") as demo:
                 fail_out = gr.Dataframe(value=_answer_init[3], buttons=[], wrap=True, elem_classes="fit-table")
 
             router_outs = [router_ts_out, router_stats_out, router_banner_out, cls_out, cm_out, miss_out,
-                            outscope_miss_out]
+                            outscope_miss_out, miss_caption_out, outscope_caption_out]
             answer_outs = [answer_ts_out, answer_stats_out, answer_banner_out, fail_out]
             router_btn.click(run_router_bench, inputs=None, outputs=router_outs)
             answer_btn.click(run_answer_bench, inputs=None, outputs=answer_outs)
