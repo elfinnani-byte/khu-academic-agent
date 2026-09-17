@@ -6,6 +6,7 @@
 - 📈 개선 기록: 무엇을 바꿔서 수치가 어떻게 변했는지 회차별로 남기고 표로 비교
 """
 import json
+import re
 import uuid
 from pathlib import Path
 
@@ -22,6 +23,22 @@ LOG_COLUMNS = ["round", "timestamp", "change_target", "change_reason", "change_d
                "router_acc", "router_macro_f1", "outscope_recall", "answer_pass_rate", "memo"]
 
 _POLICY_DOC_TEXT = (Path(__file__).parent / "data" / "policy_academic.md").read_text(encoding="utf-8")
+
+
+def _split_policy_sections(text):
+    """policy_academic.md를 '## N. 카테고리 ...' 제목 기준으로 쪼갠다 — (전체 서두, [(제목, 본문), ...])."""
+    parts = re.split(r"\n## (\d+\..*)\n", text)
+    preamble = parts[0].strip()
+    sections = []
+    for i in range(1, len(parts), 2):
+        title = parts[i].strip()
+        body = parts[i + 1].strip() if i + 1 < len(parts) else ""
+        body = re.sub(r"\n+---\s*$", "", body).strip()
+        sections.append((title, body))
+    return preamble, sections
+
+
+_POLICY_PREAMBLE, _POLICY_SECTIONS = _split_policy_sections(_POLICY_DOC_TEXT)
 
 ROUTE_LABEL = {
     "ENROLL_REG": "📘 수강·등록",
@@ -440,10 +457,13 @@ with gr.Blocks(title="대학교 학사 안내 에이전트") as demo:
             )
             with gr.Accordion("① 라우팅 분류 기준 (ROUTE_GUIDE)", open=True):
                 gr.Markdown(f"```\n{ROUTE_GUIDE.strip()}\n```", elem_classes="wrap-code")
+            with gr.Accordion("③ 카테고리별 근거 문서 매핑 (policy_academic.md)", open=False):
+                gr.Markdown(_POLICY_PREAMBLE)
+                for title, body in _POLICY_SECTIONS:
+                    with gr.Accordion(title, open=False):
+                        gr.Markdown(body)
             with gr.Accordion("② 답변 생성 규칙 (ANSWER_RULES)", open=False):
                 gr.Markdown(f"```\n{ANSWER_RULES.strip()}\n```", elem_classes="wrap-code")
-            with gr.Accordion("③ 카테고리별 근거 문서 매핑 (policy_academic.md)", open=False):
-                gr.Markdown(_POLICY_DOC_TEXT)
 
 INSPECTOR_CSS = """
 .ins-label { min-width: 88px; display: flex; align-items: center;
