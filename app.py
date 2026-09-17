@@ -310,8 +310,6 @@ with gr.Blocks(title="대학교 학사 안내 에이전트") as demo:
             answer_btn.click(run_answer_bench, inputs=None, outputs=answer_outs)
             both_btn.click(run_router_bench, inputs=None, outputs=router_outs) \
                     .then(run_answer_bench, inputs=None, outputs=answer_outs)
-            demo.load(run_router_bench, inputs=None, outputs=router_outs)
-            demo.load(run_answer_bench, inputs=None, outputs=answer_outs)
 
         with gr.Tab("📈 개선 기록"):
             gr.Markdown(
