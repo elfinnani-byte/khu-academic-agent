@@ -379,18 +379,17 @@ def _fmt_answer_cell(rate, prev_rate):
 
 
 def _fmt_memo_cell(acc, outscope_recall, memo):
-    """자유 메모(있으면 1줄)와 오분류 건수·범위밖 인식 건수 자동 요약(2줄)을 함께 보여준다.
+    """자유 메모를 첫 줄에, 오분류 건수·범위밖 인식 건수는 "- " 불릿으로 한 줄씩 그 아래에 보여준다.
     모든 회차(베이스라인 포함)에 항상 자동 요약을 붙인다 — 지우는 건 옛 설명 문장뿐이어야 한다."""
     parts = []
     if not pd.isna(acc):
         parts.append(f"오분류 {round((1 - acc) * EVAL_N)}건")
     if not pd.isna(outscope_recall):
         parts.append(f"범위밖 인식 {round(outscope_recall * OUTSCOPE_N)}/{OUTSCOPE_N}건({100 * outscope_recall:.1f}%)")
-    auto_line = " · ".join(parts)
     memo_text = _safe_str(memo)
-    if memo_text != "-" and auto_line:
-        return f"{memo_text}<br>{auto_line}"
-    return auto_line or memo_text
+    lines = [memo_text] if memo_text != "-" else []
+    lines.extend(f"- {p}" for p in parts)
+    return "<br>".join(lines) if lines else "-"
 
 
 def _log_display_df(log):
