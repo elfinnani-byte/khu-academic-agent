@@ -193,9 +193,7 @@ def _render_router(r):
                        "outscope 문항 중 OTHER로 분류", "#eef0ff"))
 
     stats_html = _stat_cards(cards)
-    banner_html = _banner(n_miss, n, unit="건",
-                           detail_note="아래 '라우트별 세부 성능표 · 혼동 행렬 · 오분류 목록 자세히 보기'를 펼쳐 "
-                                       "'오분류 목록'에서 확인하세요.")
+    banner_html = _banner(n_miss, n, unit="건", detail_note="아래 '오분류 목록'에서 확인하세요.")
     cls_df = _cls_report_df(r["classification_report"], LABELS4)
     cm_df = _cm_df(r["confusion_matrix"], LABELS4)
     miss_df = pd.DataFrame(miss, columns=["question", "gold", "pred", "confidence"]) if miss else \
