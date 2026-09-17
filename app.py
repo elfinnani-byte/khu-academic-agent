@@ -457,12 +457,12 @@ with gr.Blocks(title="대학교 학사 안내 에이전트") as demo:
             )
             with gr.Accordion("① 라우팅 분류 기준 (ROUTE_GUIDE)", open=True):
                 gr.Markdown(f"```\n{ROUTE_GUIDE.strip()}\n```", elem_classes="wrap-code")
-            with gr.Accordion("③ 카테고리별 근거 문서 매핑 (policy_academic.md)", open=False):
+            with gr.Accordion("② 카테고리별 근거 문서 매핑 (policy_academic.md)", open=False):
                 gr.Markdown(_POLICY_PREAMBLE)
                 for title, body in _POLICY_SECTIONS:
                     with gr.Accordion(title, open=False):
                         gr.Markdown(body)
-            with gr.Accordion("② 답변 생성 규칙 (ANSWER_RULES)", open=False):
+            with gr.Accordion("③ 답변 생성 규칙 (ANSWER_RULES)", open=False):
                 gr.Markdown(f"```\n{ANSWER_RULES.strip()}\n```", elem_classes="wrap-code")
 
 INSPECTOR_CSS = """
