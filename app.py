@@ -151,16 +151,18 @@ def _cls_report_df(cls_report, labels):
     return pd.DataFrame(rows, columns=["라우트", "정밀도(Precision)", "재현율(Recall)", "F1-Score", "평가 건수", "판정"])
 
 
-FIRST_COL_WIDTH = "200px"
+FIRST_COL_PCT = 18  # 1열(라우트 이름) 폭 - 표들끼리 맞추기 위해 %값 자체를 고정한다
 
 
 def _table_col_widths(df):
-    """1열(라우트 이름)은 표들끼리 폭을 맞추고, 나머지 열은 균등 폭으로 나눈다."""
+    """1열은 표들끼리 폭(%)을 맞추고, 나머지 열은 남은 폭을 균등하게 나눈다.
+    전부 %로만 구성해 합이 정확히 100%가 되게 한다 - 고정 px를 하나라도 섞으면
+    그만큼 100% 위에 더 얹혀서 가로 스크롤이 생긴다."""
     n_data_cols = len(df.columns) - 1
     if n_data_cols <= 0:
         return None
-    share = round(100 / n_data_cols, 2)
-    return [FIRST_COL_WIDTH] + [f"{share}%"] * n_data_cols
+    share = round((100 - FIRST_COL_PCT) / n_data_cols, 2)
+    return [f"{FIRST_COL_PCT}%"] + [f"{share}%"] * n_data_cols
 
 
 def _cm_cell_html(val, bg, color, weight=600):
@@ -177,8 +179,8 @@ def _cm_df(cm_list, row_labels, col_labels):
     않아(직접 확인함), 각 셀 값을 인라인 스타일이 적용된 HTML 문자열로 미리 만들어
     datatype="html" 컬럼에 넣는 방식으로 우회한다.
     """
-    disp_cols = [_route_disp(l) for l in col_labels]
-    cm = pd.DataFrame(cm_list, index=list(row_labels), columns=disp_cols)  # 행 제목은 코드 그대로(한글 없이)
+    disp_rows = [_route_disp(l) for l in row_labels]
+    cm = pd.DataFrame(cm_list, index=disp_rows, columns=list(col_labels))  # 열 제목은 코드 그대로(한글 없이)
     cm["정답 합계"] = cm.sum(axis=1)
     total = cm.sum(axis=0)
     total.name = "예측 합계"
@@ -188,17 +190,17 @@ def _cm_df(cm_list, row_labels, col_labels):
 
     label_col = "실제 정답 \\ 예측"
     data_cols = [c for c in cm.columns if c != label_col]
-    disp_by_code = {code: _route_disp(code) for code in col_labels}
+    disp_to_code = {_route_disp(l): l for l in row_labels}
 
     for i in cm.index:
-        row_label = cm.loc[i, label_col]  # 코드 원문이거나 "예측 합계"
+        row_label = cm.loc[i, label_col]  # 한글이 붙은 표시명이거나 "예측 합계"
         is_total_row = row_label == "예측 합계"
-        row_disp = disp_by_code.get(row_label)  # 대각선 판정은 한글이 붙은 열 이름과 맞춰봐야 한다
+        row_code = disp_to_code.get(row_label)  # 대각선 판정은 코드 기준으로 열 이름과 맞춰봐야 한다
         for col in data_cols:
             val = cm.loc[i, col]
             if is_total_row or col == "정답 합계":
                 cm.loc[i, col] = _cm_cell_html(val, "#f4f4f7", "#555")
-            elif col == row_disp:
+            elif col == row_code:
                 cm.loc[i, col] = _cm_cell_html(val, "#d9f5e3", "#1e5631", 700)
             elif val:
                 cm.loc[i, col] = _cm_cell_html(val, "#fdeaea", "#7a1f1f")
@@ -475,24 +477,26 @@ with gr.Blocks(title="대학교 학사 안내 에이전트") as demo:
                 with gr.Group():
                     gr.Markdown("**라우트별 세부 성능 평가표 (Classification Report)**")
                     cls_out = gr.Dataframe(value=_router_init[3], buttons=[], wrap=True,
-                                            column_widths=_table_col_widths(_router_init[3]))
+                                            column_widths=_table_col_widths(_router_init[3]),
+                                            elem_classes="fit-table")
                 with gr.Group():
                     gr.Markdown(
                         "**혼동 행렬 (Confusion Matrix)** — 행(실제 정답) → 열(모델 예측)\n\n"
                         "🟩 초록 칸(대각선) = 예측이 적중한 건수 · 🟥 빨강 칸 = 오분류된 건수(0보다 큰 칸만 강조)"
                     )
                     cm_out = gr.Dataframe(value=_router_init[4], buttons=[], wrap=True, datatype="html",
-                                           column_widths=_table_col_widths(_router_init[4]))
+                                           column_widths=_table_col_widths(_router_init[4]),
+                                           elem_classes="fit-table")
                 with gr.Group():
                     gr.Markdown("**오분류 목록**")
-                    miss_out = gr.Dataframe(value=_router_init[5], buttons=[], wrap=True)
+                    miss_out = gr.Dataframe(value=_router_init[5], buttons=[], wrap=True, elem_classes="fit-table")
 
             _answer_init = _cached_answer_outs()
             answer_ts_out = gr.Markdown(_answer_init[0], elem_classes="section-heading")
             answer_stats_out = gr.HTML(_answer_init[1])
             answer_banner_out = gr.HTML(_answer_init[2])
             with gr.Accordion("실패 사례 자세히 보기", open=False):
-                fail_out = gr.Dataframe(value=_answer_init[3], buttons=[], wrap=True)
+                fail_out = gr.Dataframe(value=_answer_init[3], buttons=[], wrap=True, elem_classes="fit-table")
 
             router_outs = [router_ts_out, router_stats_out, router_banner_out, cls_out, cm_out, miss_out]
             answer_outs = [answer_ts_out, answer_stats_out, answer_banner_out, fail_out]
@@ -509,7 +513,7 @@ with gr.Blocks(title="대학교 학사 안내 에이전트") as demo:
                 "회차는 성능 벤치마크 탭에서 측정한 뒤 여기에 추가되며, 이 탭 자체에는 입력칸이 없습니다."
             )
             refresh_btn = gr.Button("표 새로고침")
-            log_table = gr.Dataframe(value=_log_display_df(_load_log()), wrap=True, buttons=[])
+            log_table = gr.Dataframe(value=_log_display_df(_load_log()), wrap=True, buttons=[], elem_classes="fit-table")
 
             refresh_btn.click(refresh_log, outputs=log_table)
 
@@ -543,6 +547,13 @@ INSPECTOR_CSS = """
     overflow: visible !important;
 }
 .section-heading h4 { margin: 0; }
+.fit-table table { table-layout: fixed; width: 100% !important; }
+.fit-table, .fit-table * { font-size: 0.82rem !important; }
+.fit-table td, .fit-table th {
+    padding: 4px 6px !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+}
 """
 
 if __name__ == "__main__":
