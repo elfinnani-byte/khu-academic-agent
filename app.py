@@ -439,9 +439,9 @@ with gr.Blocks(title="대학교 학사 안내 에이전트") as demo:
                 "`prompts.py`에 실제로 들어있는 프롬프트 원문이며, 라우팅 결과가 이상해 보일 때 가장 먼저 확인할 곳입니다."
             )
             with gr.Accordion("① 라우팅 분류 기준 (ROUTE_GUIDE)", open=True):
-                gr.Markdown(f"```\n{ROUTE_GUIDE.strip()}\n```")
+                gr.Markdown(f"```\n{ROUTE_GUIDE.strip()}\n```", elem_classes="wrap-code")
             with gr.Accordion("② 답변 생성 규칙 (ANSWER_RULES)", open=False):
-                gr.Markdown(f"```\n{ANSWER_RULES.strip()}\n```")
+                gr.Markdown(f"```\n{ANSWER_RULES.strip()}\n```", elem_classes="wrap-code")
             with gr.Accordion("③ 카테고리별 근거 문서 매핑 (policy_academic.md)", open=False):
                 gr.Markdown(_POLICY_DOC_TEXT)
 
@@ -449,6 +449,12 @@ INSPECTOR_CSS = """
 .ins-label { min-width: 88px; display: flex; align-items: center;
              font-size: 0.9em; color: var(--body-text-color-subdued); background: none !important; }
 .ins-label p { margin: 0; background: none !important; }
+.wrap-code pre, .wrap-code pre code {
+    white-space: pre-wrap !important;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    overflow-x: hidden !important;
+}
 """
 
 if __name__ == "__main__":
