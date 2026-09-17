@@ -1,2 +1,3 @@
-round,timestamp,change_target,change_reason,change_detail,router_acc,router_macro_f1,outscope_recall,answer_pass_rate,memo
+﻿round,timestamp,change_target,change_reason,change_detail,router_acc,router_macro_f1,outscope_recall,answer_pass_rate,memo
 0,2026-09-18 03:00:42,초기 상태(베이스라인),베이스라인 설정 / 개선 지점 파악 목적,초기 소스코드 그대로 평가 실행,0.883,0.906,0.55,1.0,[베이스라인]
+1,2026-09-18 03:49:33,prompts.py (ROUTE_GUIDE),범위밖 인식률이 낮아 OTHER 트랩 우선순위 규칙 추가,판단 원칙 0번 신설 — 키워드 매칭 전에 개인정보조회·미래예측·서류요청·타기관상담·미보유문서 5개 트랩 유형부터 확인,0.883,0.912,0.75,1.0,- 범위밖 오분류 9건→5건으로 감소(기숙사비·장학금 자격조회·편입 학점인정 등 트랩 인식 개선)<br>{AUTO}<br>- 부작용: 자퇴 등록금 환급·시험 부정행위 질문 2건이 트랩 규칙에 걸려 새로 OTHER 오분류 → 4-카테고리 정확도 개선분 상쇄

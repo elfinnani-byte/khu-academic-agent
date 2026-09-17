@@ -378,17 +378,34 @@ def _fmt_answer_cell(rate, prev_rate):
     return f"{rate_disp}<br>{n_pass}/{ANSWER_N}건"
 
 
-def _fmt_memo_cell(acc, outscope_recall, memo):
-    """자유 메모를 첫 줄에, 오분류 건수·범위밖 인식 건수는 "- " 불릿으로 한 줄씩 그 아래에 보여준다.
-    모든 회차(베이스라인 포함)에 항상 자동 요약을 붙인다 — 지우는 건 옛 설명 문장뿐이어야 한다."""
+def _fmt_memo_cell(acc, outscope_recall, memo, prev_acc, prev_outscope_recall):
+    """자유 메모와 자동 계산되는 오분류·범위밖 인식 건수를 합쳐 보여준다.
+    직전 회차와 값이 완전히 같은 항목은 굳이 다시 안 적는다(베이스라인은 비교 대상이 없어 둘 다 보여준다).
+    메모 안에 {AUTO} 자리표시자를 넣으면 그 위치에 자동 계산 줄이 끼워지고, 없으면 메모 뒤에 이어붙는다
+    — 자동 계산 줄을 자유 메모 문장들 사이 원하는 위치에 넣고 싶을 때 쓴다."""
+    def _n_miss(a):
+        return None if a is None or pd.isna(a) else round((1 - a) * EVAL_N)
+
+    def _n_hit(o):
+        return None if o is None or pd.isna(o) else round(o * OUTSCOPE_N)
+
     parts = []
-    if not pd.isna(acc):
-        parts.append(f"오분류 {round((1 - acc) * EVAL_N)}건")
-    if not pd.isna(outscope_recall):
-        parts.append(f"범위밖 인식 {round(outscope_recall * OUTSCOPE_N)}/{OUTSCOPE_N}건({100 * outscope_recall:.1f}%)")
+    n_miss, prev_n_miss = _n_miss(acc), _n_miss(prev_acc)
+    if n_miss is not None and n_miss != prev_n_miss:
+        parts.append(f"오분류 {n_miss}건")
+    n_hit, prev_n_hit = _n_hit(outscope_recall), _n_hit(prev_outscope_recall)
+    if n_hit is not None and n_hit != prev_n_hit:
+        parts.append(f"범위밖 인식 {n_hit}/{OUTSCOPE_N}건({100 * outscope_recall:.1f}%)")
+    auto_block = "<br>".join(f"- {p}" for p in parts)
+
     memo_text = _safe_str(memo)
+    if "{AUTO}" in memo_text:
+        merged = memo_text.replace("{AUTO}", auto_block)
+        merged = "<br>".join(seg for seg in merged.split("<br>") if seg.strip())
+        return merged or "-"
     lines = [memo_text] if memo_text != "-" else []
-    lines.extend(f"- {p}" for p in parts)
+    if auto_block:
+        lines.append(auto_block)
     return "<br>".join(lines) if lines else "-"
 
 
@@ -402,6 +419,7 @@ def _log_display_df(log):
         prev = log.iloc[i - 1] if i > 0 else None
         prev_acc = prev["router_acc"] if prev is not None else None
         prev_rate = prev["answer_pass_rate"] if prev is not None else None
+        prev_outscope = prev["outscope_recall"] if prev is not None else None
         rows.append({
             "회차": int(r["round"]),
             "변경 대상": _safe_str(r.get("change_target")),
@@ -409,7 +427,8 @@ def _log_display_df(log):
             "변경내용(What)": _safe_str(r.get("change_detail")),
             "의도 분류 정확도": _fmt_router_cell(r["router_acc"], r["router_macro_f1"], prev_acc),
             "답변 통과율": _fmt_answer_cell(r["answer_pass_rate"], prev_rate),
-            "성과 및 오답 메모": _fmt_memo_cell(r["router_acc"], r["outscope_recall"], r.get("memo")),
+            "성과 및 오답 메모": _fmt_memo_cell(r["router_acc"], r["outscope_recall"], r.get("memo"),
+                                          prev_acc, prev_outscope),
         })
     return pd.DataFrame(rows, columns=LOG_DISPLAY_COLUMNS)
 
@@ -520,14 +539,18 @@ with gr.Blocks(title="대학교 학사 안내 에이전트") as demo:
                 with gr.Column():
                     answer_btn = gr.Button("② 1턴 답변 통과율만 채점 실행 (골든셋 16건)", variant="primary")
 
-            _router_init = _cached_router_outs()
-            router_ts_out = gr.Markdown(_router_init[0], elem_classes="section-heading")
-            router_stats_out = gr.HTML(_router_init[1])
-            router_banner_out = gr.HTML(_router_init[2])
+            # value=고정값이 아니라 콜러블을 넘긴다 — Gradio가 "페이지 로드마다" 다시 불러주므로
+            # 서버 재시작 없이도 브라우저 새로고침만으로 bench_cache.json의 최신 내용이 반영된다.
+            # (실제 채점을 다시 돌리는 게 아니라 이미 저장된 캐시를 다시 읽어 표만 새로 그리는 것이라
+            # "페이지 로드시 자동 채점 금지" 원칙과 충돌하지 않는다.)
+            _router_init = _cached_router_outs()  # 컬럼 스키마(개수)만 참고 — 값 자체는 아래에서 콜러블로 대체
+            router_ts_out = gr.Markdown(lambda: _cached_router_outs()[0], elem_classes="section-heading")
+            router_stats_out = gr.HTML(lambda: _cached_router_outs()[1])
+            router_banner_out = gr.HTML(lambda: _cached_router_outs()[2])
             with gr.Accordion("라우트별 세부 성능표 · 혼동 행렬 · 오분류 목록 · 범위밖 오분류 목록 자세히 보기", open=False):
                 with gr.Group():
                     gr.Markdown("**라우트별 세부 성능 평가표 (Classification Report)**")
-                    cls_out = gr.Dataframe(value=_router_init[3], buttons=[], wrap=True,
+                    cls_out = gr.Dataframe(value=lambda: _cached_router_outs()[3], buttons=[], wrap=True,
                                             column_widths=_table_col_widths(_router_init[3]),
                                             elem_classes="fit-table")
                 with gr.Group():
@@ -535,25 +558,27 @@ with gr.Blocks(title="대학교 학사 안내 에이전트") as demo:
                         "**혼동 행렬 (Confusion Matrix)** — 행(실제 정답) → 열(모델 예측)\n\n"
                         "🟩 초록 칸(대각선) = 예측이 적중한 건수 · 🟥 빨강 칸 = 오분류된 건수(0보다 큰 칸만 강조)"
                     )
-                    cm_out = gr.Dataframe(value=_router_init[4], buttons=[], wrap=True, datatype="html",
+                    cm_out = gr.Dataframe(value=lambda: _cached_router_outs()[4], buttons=[], wrap=True, datatype="html",
                                            column_widths=_table_col_widths(_router_init[4]),
                                            elem_classes="fit-table")
                 with gr.Group():
-                    miss_caption_out = gr.Markdown(_router_init[7])
-                    miss_out = gr.Dataframe(value=_router_init[5], buttons=[], wrap=True, elem_classes="fit-table",
+                    miss_caption_out = gr.Markdown(lambda: _cached_router_outs()[7])
+                    miss_out = gr.Dataframe(value=lambda: _cached_router_outs()[5], buttons=[], wrap=True,
+                                             elem_classes="fit-table",
                                              column_widths=["52%", "16%", "16%", "16%"])
                 with gr.Group():
-                    outscope_caption_out = gr.Markdown(_router_init[8])
-                    outscope_miss_out = gr.Dataframe(value=_router_init[6], buttons=[], wrap=True,
+                    outscope_caption_out = gr.Markdown(lambda: _cached_router_outs()[8])
+                    outscope_miss_out = gr.Dataframe(value=lambda: _cached_router_outs()[6], buttons=[], wrap=True,
                                                       elem_classes="fit-table",
                                                       column_widths=["52%", "16%", "16%", "16%"])
 
-            _answer_init = _cached_answer_outs()
-            answer_ts_out = gr.Markdown(_answer_init[0], elem_classes="section-heading")
-            answer_stats_out = gr.HTML(_answer_init[1])
-            answer_banner_out = gr.HTML(_answer_init[2])
+            _answer_init = _cached_answer_outs()  # 컬럼 스키마만 참고
+            answer_ts_out = gr.Markdown(lambda: _cached_answer_outs()[0], elem_classes="section-heading")
+            answer_stats_out = gr.HTML(lambda: _cached_answer_outs()[1])
+            answer_banner_out = gr.HTML(lambda: _cached_answer_outs()[2])
             with gr.Accordion("실패 사례 자세히 보기", open=False):
-                fail_out = gr.Dataframe(value=_answer_init[3], buttons=[], wrap=True, elem_classes="fit-table")
+                fail_out = gr.Dataframe(value=lambda: _cached_answer_outs()[3], buttons=[], wrap=True,
+                                         elem_classes="fit-table")
 
             router_outs = [router_ts_out, router_stats_out, router_banner_out, cls_out, cm_out, miss_out,
                             outscope_miss_out, miss_caption_out, outscope_caption_out]
@@ -579,8 +604,8 @@ with gr.Blocks(title="대학교 학사 안내 에이전트") as demo:
                 "회차는 성능 벤치마크 탭에서 측정한 뒤 여기에 추가되며, 이 탭 자체에는 입력칸이 없습니다."
             )
             refresh_btn = gr.Button("표 새로고침")
-            log_table = gr.Dataframe(value=_log_display_df(_load_log()), wrap=True, buttons=[], elem_classes="fit-table",
-                                      column_widths=["6%", "14%", "18%", "18%", "16%", "14%", "14%"],
+            log_table = gr.Dataframe(value=lambda: _log_display_df(_load_log()), wrap=True, buttons=[], elem_classes="fit-table",
+                                      column_widths=["4%", "10%", "20%", "22%", "12%", "10%", "22%"],
                                       datatype=["str", "str", "str", "str", "html", "html", "html"])
 
             refresh_btn.click(refresh_log, outputs=log_table)
