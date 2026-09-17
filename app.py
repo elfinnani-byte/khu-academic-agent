@@ -122,7 +122,7 @@ def _stat_cards(cards):
     return f'<div style="display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 2px;">{items}</div>'
 
 
-def _banner(n_bad, n_total, unit="문항"):
+def _banner(n_bad, n_total, unit="문항", detail_note="아래 표에서 확인하세요."):
     if n_total == 0:
         return ""
     if n_bad == 0:
@@ -130,7 +130,7 @@ def _banner(n_bad, n_total, unit="문항"):
                 f'text-align:center;font-weight:600;color:#1e5631;">✅ 오류 0건 — {n_total}{unit} 전수 통과했습니다.</div>')
     return (f'<div style="background:#fdeaea;border:1px solid #f3b7b7;border-radius:10px;padding:12px;'
             f'text-align:center;font-weight:600;color:#7a1f1f;">⚠️ {n_bad}건 실패 / {n_total}{unit} — '
-            f'아래 표에서 실패 사례를 확인하세요.</div>')
+            f'{detail_note}</div>')
 
 
 def _cls_report_df(cls_report, labels):
@@ -193,7 +193,9 @@ def _render_router(r):
                        "outscope 문항 중 OTHER로 분류", "#eef0ff"))
 
     stats_html = _stat_cards(cards)
-    banner_html = _banner(n_miss, n, unit="건")
+    banner_html = _banner(n_miss, n, unit="건",
+                           detail_note="아래 '라우트별 세부 성능표 · 혼동 행렬 · 오분류 목록 자세히 보기'를 펼쳐 "
+                                       "'오분류 목록'에서 확인하세요.")
     cls_df = _cls_report_df(r["classification_report"], LABELS4)
     cm_df = _cm_df(r["confusion_matrix"], LABELS4)
     miss_df = pd.DataFrame(miss, columns=["question", "gold", "pred", "confidence"]) if miss else \
@@ -220,7 +222,7 @@ def _render_answer(r):
          "모범답안이 채점 기준을 통과하는지", "#fdeaea" if bad else "#e8f9ee"),
     ]
     stats_html = _stat_cards(cards)
-    banner_html = _banner(n - n_pass, n, unit="건")
+    banner_html = _banner(n - n_pass, n, unit="건", detail_note="아래 '실패 사례 자세히 보기'를 펼쳐 확인하세요.")
     fail_df = pd.DataFrame(r.get("failures", []) or [], columns=["conv", "기대", "실제", "fails", "answer"])
     return stats_html, banner_html, fail_df
 
