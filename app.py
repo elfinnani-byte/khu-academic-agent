@@ -15,10 +15,13 @@ import pandas as pd
 import evaluate as ev
 from agent import chat_app
 from config import GRADIO_PORT, LABELS4
+from prompts import ANSWER_RULES, ROUTE_GUIDE
 
 LOG_PATH = Path(__file__).parent / "experiment_log.csv"
 LOG_COLUMNS = ["round", "timestamp", "change_target", "change_reason", "change_detail",
                "router_acc", "router_macro_f1", "outscope_recall", "answer_pass_rate", "memo"]
+
+_POLICY_DOC_TEXT = (Path(__file__).parent / "data" / "policy_academic.md").read_text(encoding="utf-8")
 
 ROUTE_LABEL = {
     "ENROLL_REG": "📘 수강·등록",
@@ -181,14 +184,59 @@ def run_answer_bench():
 
 
 # ───────────────────────── 📈 개선 기록 ─────────────────────────
+LOG_DISPLAY_COLUMNS = ["회차", "변경 대상", "바뀐 이유", "바뀐 내용",
+                       "정확도", "Macro F1", "범위밖 인식률", "답변 통과율", "결과 메모"]
+
+
 def _load_log():
     if LOG_PATH.exists():
         return pd.read_csv(LOG_PATH)
     return pd.DataFrame(columns=LOG_COLUMNS)
 
 
+def _fmt_metric(cur, prev, pct):
+    """이전 회차 값과 비교한 증감을 괄호로 같이 보여준다. 첫 회차(prev 없음)는 '(기준)'."""
+    if pd.isna(cur):
+        return "-"
+    val = f"{100 * cur:.1f}%" if pct else f"{cur:.3f}"
+    if prev is None or pd.isna(prev):
+        return f"{val} (기준)"
+    diff = cur - prev
+    unit = "%p" if pct else ""
+    diff_disp = f"{100 * abs(diff):.1f}{unit}" if pct else f"{abs(diff):.3f}"
+    if abs(diff) < (0.0005 if pct else 0.0005):
+        return f"{val} (=)"
+    return f"{val} ({'▲' if diff > 0 else '▼'}{diff_disp})"
+
+
+def _safe_str(v):
+    return "-" if v is None or (isinstance(v, float) and pd.isna(v)) or v == "" else str(v)
+
+
+def _log_display_df(log):
+    """CSV 원본(숫자 그대로)을 사람이 바로 읽을 수 있는 표로 바꾼다 — 컬럼명을 한글로, 지표는 직전 회차 대비 증감을 같이 표시."""
+    if log.empty:
+        return pd.DataFrame(columns=LOG_DISPLAY_COLUMNS)
+    rows = []
+    for i in range(len(log)):
+        r = log.iloc[i]
+        prev = log.iloc[i - 1] if i > 0 else None
+        rows.append({
+            "회차": int(r["round"]),
+            "변경 대상": _safe_str(r.get("change_target")),
+            "바뀐 이유": _safe_str(r.get("change_reason")),
+            "바뀐 내용": _safe_str(r.get("change_detail")),
+            "정확도": _fmt_metric(r["router_acc"], prev["router_acc"] if prev is not None else None, pct=True),
+            "Macro F1": _fmt_metric(r["router_macro_f1"], prev["router_macro_f1"] if prev is not None else None, pct=False),
+            "범위밖 인식률": _fmt_metric(r["outscope_recall"], prev["outscope_recall"] if prev is not None else None, pct=True),
+            "답변 통과율": _fmt_metric(r["answer_pass_rate"], prev["answer_pass_rate"] if prev is not None else None, pct=True),
+            "결과 메모": _safe_str(r.get("memo")),
+        })
+    return pd.DataFrame(rows, columns=LOG_DISPLAY_COLUMNS)
+
+
 def refresh_log():
-    return _load_log()
+    return _log_display_df(_load_log())
 
 
 def _run_metrics(sample):
@@ -313,24 +361,28 @@ with gr.Blocks(title="대학교 학사 안내 에이전트") as demo:
 
         with gr.Tab("📈 개선 기록"):
             gr.Markdown(
-                "무엇을 왜 바꿨고 수치가 어떻게 움직였는지 회차별로 남깁니다. "
-                "원칙: 평가셋은 프롬프트에 넣지 않기 · 한 번에 하나만 바꾸기 · 바뀐 것과 숫자를 같이 기록하기."
+                "### 종합 실험 기록표\n"
+                "무엇을 왜 바꿨고 수치가 어떻게 움직였는지 회차별로 남긴 기록입니다. "
+                "원칙: 평가셋은 프롬프트에 넣지 않기 · 한 번에 하나만 바꾸기 · 바뀐 것과 숫자를 같이 기록하기.\n\n"
+                "회차는 성능 벤치마크 탭에서 측정한 뒤 여기에 추가되며, 이 탭 자체에는 입력칸이 없습니다."
             )
-            with gr.Row():
-                target_in = gr.Textbox(label="변경 대상", placeholder="예: prompts.py (ROUTE_GUIDE)")
-                reason_in = gr.Textbox(label="바꾼 이유", placeholder="예: 범위밖 인식률이 낮아서")
-            detail_in = gr.Textbox(label="바꾼 내용", placeholder="예: OTHER 예시 문장 5개 추가")
-            memo_in = gr.Textbox(label="결과 메모", placeholder="예: 범위밖은 좋아졌지만 정확도가 떨어짐 → 원복")
-            log_sample_in = gr.Number(label="측정 샘플 수 (비우면 전체)", value=None, precision=0)
-            with gr.Row():
-                add_btn = gr.Button("현재 상태로 기록 추가", variant="primary")
-                refresh_btn = gr.Button("표 새로고침")
-            log_status = gr.Markdown()
-            log_table = gr.Dataframe(value=_load_log(), wrap=True)
+            refresh_btn = gr.Button("표 새로고침")
+            log_table = gr.Dataframe(value=_log_display_df(_load_log()), wrap=True)
 
-            add_btn.click(add_log_entry, inputs=[target_in, reason_in, detail_in, memo_in, log_sample_in],
-                         outputs=[log_table, log_status])
             refresh_btn.click(refresh_log, outputs=log_table)
+
+        with gr.Tab("📋 라우트 및 업무 규정"):
+            gr.Markdown(
+                "### 에이전트가 따르는 분류·응대 기준\n"
+                "에이전트가 문의를 어떻게 나누고(라우팅) 어떤 규칙으로 답하는지(응대) 그대로 보여줍니다. "
+                "`prompts.py`에 실제로 들어있는 프롬프트 원문이며, 라우팅 결과가 이상해 보일 때 가장 먼저 확인할 곳입니다."
+            )
+            with gr.Accordion("① 라우팅 분류 기준 (ROUTE_GUIDE)", open=True):
+                gr.Markdown(f"```\n{ROUTE_GUIDE.strip()}\n```")
+            with gr.Accordion("② 답변 생성 규칙 (ANSWER_RULES)", open=False):
+                gr.Markdown(f"```\n{ANSWER_RULES.strip()}\n```")
+            with gr.Accordion("③ 카테고리별 근거 문서 매핑 (policy_academic.md)", open=False):
+                gr.Markdown(_POLICY_DOC_TEXT)
 
 INSPECTOR_CSS = """
 .ins-label { min-width: 88px; display: flex; align-items: center;
