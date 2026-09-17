@@ -342,12 +342,12 @@ def _load_log():
 
 
 def _fmt_metric(cur, prev, pct):
-    """이전 회차 값과 비교한 증감을 괄호로 같이 보여준다. 첫 회차(prev 없음)는 '(기준)'."""
+    """이전 회차 값과 비교한 증감을 괄호로 같이 보여준다. 첫 회차(prev 없음)는 증감 표시 없이 값만."""
     if pd.isna(cur):
         return "-"
     val = f"{100 * cur:.1f}%" if pct else f"{cur:.3f}"
     if prev is None or pd.isna(prev):
-        return f"{val} (기준)"
+        return val
     diff = cur - prev
     unit = "%p" if pct else ""
     diff_disp = f"{100 * abs(diff):.1f}{unit}" if pct else f"{abs(diff):.3f}"
@@ -361,32 +361,35 @@ def _safe_str(v):
 
 
 def _fmt_router_cell(acc, f1, prev_acc):
-    """정확도(직전 회차 대비 증감) + macro F1 점수를 한 칸에 담는다."""
+    """정확도(직전 회차 대비 증감) + macro F1 점수를 2줄로 담는다."""
     if pd.isna(acc):
         return "-"
     acc_disp = _fmt_metric(acc, prev_acc, pct=True)
     f1_disp = f"F1 {f1:.3f}" if not pd.isna(f1) else "F1 -"
-    return f"{acc_disp} · {f1_disp}"
+    return f"{acc_disp}<br>{f1_disp}"
 
 
 def _fmt_answer_cell(rate, prev_rate):
-    """통과율(직전 회차 대비 증감) + 통과 건수를 한 칸에 담는다."""
+    """통과율(직전 회차 대비 증감) + 통과 건수를 2줄로 담는다."""
     if pd.isna(rate):
         return "-"
     rate_disp = _fmt_metric(rate, prev_rate, pct=True)
     n_pass = round(rate * ANSWER_N)
-    return f"{rate_disp} · {n_pass}/{ANSWER_N}건"
+    return f"{rate_disp}<br>{n_pass}/{ANSWER_N}건"
 
 
-def _fmt_memo_cell(acc, outscope_recall, memo):
-    """오분류 건수·범위밖 인식 건수를 자동 계산해 메모(답변 탈락 사유 요약 등) 앞에 붙인다."""
+def _fmt_memo_cell(acc, outscope_recall, memo, is_baseline):
+    """오분류 건수·범위밖 인식 건수를 자동 계산해 메모(답변 탈락 사유 요약 등) 앞에 붙인다.
+    베이스라인(첫 회차)은 비교 대상이 없어 이 자동 요약을 붙이지 않고 메모만 그대로 보여준다."""
+    memo_text = _safe_str(memo)
+    if is_baseline:
+        return memo_text
     parts = []
     if not pd.isna(acc):
         parts.append(f"오분류 {round((1 - acc) * EVAL_N)}건")
     if not pd.isna(outscope_recall):
         parts.append(f"범위밖 인식 {round(outscope_recall * OUTSCOPE_N)}/{OUTSCOPE_N}건({100 * outscope_recall:.1f}%)")
     prefix = " · ".join(parts)
-    memo_text = _safe_str(memo)
     if prefix and memo_text != "-":
         return f"{prefix} — {memo_text}"
     return prefix or memo_text
@@ -409,7 +412,7 @@ def _log_display_df(log):
             "변경내용(What)": _safe_str(r.get("change_detail")),
             "의도 분류 정확도": _fmt_router_cell(r["router_acc"], r["router_macro_f1"], prev_acc),
             "답변 통과율": _fmt_answer_cell(r["answer_pass_rate"], prev_rate),
-            "성과 및 오답 메모": _fmt_memo_cell(r["router_acc"], r["outscope_recall"], r.get("memo")),
+            "성과 및 오답 메모": _fmt_memo_cell(r["router_acc"], r["outscope_recall"], r.get("memo"), prev is None),
         })
     return pd.DataFrame(rows, columns=LOG_DISPLAY_COLUMNS)
 
@@ -565,18 +568,7 @@ with gr.Blocks(title="대학교 학사 안내 에이전트") as demo:
 
         with gr.Tab("📈 개선 기록"):
             gr.Markdown(
-                "### 1. 종합 실험 기록표\n"
-                "무엇을 왜 바꿨고 수치가 어떻게 움직였는지 회차별로 남긴 기록입니다. "
-                "회차는 성능 벤치마크 탭에서 측정한 뒤 여기에 추가되며, 이 탭 자체에는 입력칸이 없습니다."
-            )
-            refresh_btn = gr.Button("표 새로고침")
-            log_table = gr.Dataframe(value=_log_display_df(_load_log()), wrap=True, buttons=[], elem_classes="fit-table",
-                                      column_widths=["6%", "14%", "18%", "18%", "16%", "14%", "14%"])
-
-            refresh_btn.click(refresh_log, outputs=log_table)
-
-            gr.Markdown(
-                "### 2. 실험 목표\n"
+                "### 1. 실험 목표\n"
                 "① 의도 분류 정확도·macro F1, ② 범위밖 인식률, ③ 1턴 답변 통과율 — 세 지표를 함께 끌어올리되, "
                 "하나가 좋아지는 대신 다른 하나가 나빠지는 트레이드오프를 놓치지 않는 것이 목표입니다.\n\n"
                 "**실험 원칙**\n"
@@ -584,6 +576,17 @@ with gr.Blocks(title="대학교 학사 안내 에이전트") as demo:
                 "2. 한 번에 하나만 바꾼다 — 여러 변경을 묶어서 재보면 어느 변경이 효과를 냈는지 알 수 없다\n"
                 "3. 바뀐 것과 숫자를 같이 기록한다 — 무엇을·왜 바꿨는지와 세 지표가 어떻게 움직였는지를 한 회차로 남긴다"
             )
+            gr.Markdown(
+                "### 2. 종합 실험 기록표\n"
+                "무엇을 왜 바꿨고 수치가 어떻게 움직였는지 회차별로 남긴 기록입니다. "
+                "회차는 성능 벤치마크 탭에서 측정한 뒤 여기에 추가되며, 이 탭 자체에는 입력칸이 없습니다."
+            )
+            refresh_btn = gr.Button("표 새로고침")
+            log_table = gr.Dataframe(value=_log_display_df(_load_log()), wrap=True, buttons=[], elem_classes="fit-table",
+                                      column_widths=["6%", "14%", "18%", "18%", "16%", "14%", "14%"],
+                                      datatype=["str", "str", "str", "str", "html", "html", "str"])
+
+            refresh_btn.click(refresh_log, outputs=log_table)
 
         with gr.Tab("📋 라우트 및 업무 규정"):
             gr.Markdown(
