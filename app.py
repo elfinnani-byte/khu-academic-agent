@@ -273,16 +273,19 @@ with gr.Blocks(title="대학교 학사 안내 에이전트") as demo:
         with gr.Tab("📊 성능 벤치마크"):
             gr.Markdown(
                 "### 핵심 성능 지표 실시간 측정\n"
-                "라우팅과 답변, 두 성능을 각각 따로 측정합니다. 버튼을 누르면 평가셋 전체를 "
-                "실제로 다시 추론해서 아래 표를 새로 채웁니다(샘플링 없이 항상 전수 평가)."
+                "라우팅과 답변, 두 성능을 각각 따로 측정할 수도, 한 번에 같이 측정할 수도 있습니다. "
+                "버튼을 누르면 평가셋 전체를 실제로 다시 추론해서 아래 표를 새로 채웁니다(샘플링 없이 항상 전수 평가).\n\n"
+                "베이스라인처럼 두 지표를 같은 시점 기준으로 비교하려면 아래 **①+② 전체 재측정**을 누르세요 "
+                "— 두 버튼을 각각 누르면 서로 다른 시점에 측정된 값이 섞일 수 있습니다."
             )
+            both_btn = gr.Button("①+② 전체 재측정 (라우팅 + 답변 동시)", variant="secondary")
             with gr.Row():
                 with gr.Column():
                     gr.Markdown("**① 의도 분류(라우팅) 성능** — eval 60건 + outscope 20건 전체")
-                    router_btn = gr.Button("의도 분류 채점 실행", variant="primary")
+                    router_btn = gr.Button("의도 분류만 채점 실행", variant="primary")
                 with gr.Column():
                     gr.Markdown("**② 1턴 답변 성능** — 골든셋 16건 전체")
-                    answer_btn = gr.Button("1턴 답변 통과율 채점 실행", variant="primary")
+                    answer_btn = gr.Button("1턴 답변 통과율만 채점 실행", variant="primary")
 
             gr.Markdown("#### ① 의도 분류(라우팅) 결과")
             router_stats_out = gr.HTML()
@@ -305,6 +308,8 @@ with gr.Blocks(title="대학교 학사 안내 에이전트") as demo:
             answer_outs = [answer_stats_out, answer_banner_out, fail_out]
             router_btn.click(run_router_bench, inputs=None, outputs=router_outs)
             answer_btn.click(run_answer_bench, inputs=None, outputs=answer_outs)
+            both_btn.click(run_router_bench, inputs=None, outputs=router_outs) \
+                    .then(run_answer_bench, inputs=None, outputs=answer_outs)
             demo.load(run_router_bench, inputs=None, outputs=router_outs)
             demo.load(run_answer_bench, inputs=None, outputs=answer_outs)
 
