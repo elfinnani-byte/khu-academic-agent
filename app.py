@@ -138,9 +138,29 @@ def _cm_df(cm_list, labels):
     return cm.reset_index(drop=True)
 
 
-def run_router_bench():
-    """① 의도 분류(라우팅) 성능만 따로 측정한다. 평가셋 전체를 무조건 다 돈다(샘플링 없음)."""
-    r = ev.eval_router(report=True, sample=None)
+# 마지막 측정 결과를 디스크에 남겨서, 서버를 재시작하거나 페이지를 새로고침해도
+# (자동 재측정 없이) 마지막으로 실제 측정된 값이 계속 보이도록 한다.
+BENCH_CACHE_PATH = Path(__file__).parent / "bench_cache.json"
+
+
+def _load_bench_cache():
+    if BENCH_CACHE_PATH.exists():
+        return json.loads(BENCH_CACHE_PATH.read_text(encoding="utf-8"))
+    return {}
+
+
+def _save_bench_cache(key, result):
+    cache = _load_bench_cache()
+    cache[key] = {"measured_at": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S"), "result": result}
+    BENCH_CACHE_PATH.write_text(json.dumps(cache, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _ts_caption(key):
+    entry = _load_bench_cache().get(key)
+    return f"🕒 마지막 측정: {entry['measured_at']}" if entry else "_아직 측정한 기록이 없습니다._"
+
+
+def _render_router(r):
     n, acc, f1 = r["n"], r["acc"], r["macro_f1"]
     miss = r.get("misclassified", []) or []
     n_miss = len(miss)
@@ -164,9 +184,14 @@ def run_router_bench():
     return stats_html, banner_html, cls_df, cm_df, miss_df
 
 
-def run_answer_bench():
-    """② 1턴 답변 성능만 따로 측정한다. 골든셋 전체를 무조건 다 돈다(샘플링 없음)."""
-    r = ev.eval_answer(report=True, sample=None)
+def run_router_bench():
+    """① 의도 분류(라우팅) 성능만 따로 측정한다. 평가셋 전체를 무조건 다 돈다(샘플링 없음)."""
+    r = ev.eval_router(report=True, sample=None)
+    _save_bench_cache("router", r)
+    return (_ts_caption("router"), *_render_router(r))
+
+
+def _render_answer(r):
     n, rate = r["n"], r["pass_rate"]
     n_pass = round(rate * n)
     bad = r.get("self_check_bad", [])
@@ -181,6 +206,30 @@ def run_answer_bench():
     banner_html = _banner(n - n_pass, n, unit="건")
     fail_df = pd.DataFrame(r.get("failures", []) or [], columns=["conv", "기대", "실제", "fails", "answer"])
     return stats_html, banner_html, fail_df
+
+
+def run_answer_bench():
+    """② 1턴 답변 성능만 따로 측정한다. 골든셋 전체를 무조건 다 돈다(샘플링 없음)."""
+    r = ev.eval_answer(report=True, sample=None)
+    _save_bench_cache("answer", r)
+    return (_ts_caption("answer"), *_render_answer(r))
+
+
+def _cached_router_outs():
+    cached = _load_bench_cache().get("router")
+    if not cached:
+        empty_cls = pd.DataFrame(columns=["라우트", "정밀도(Precision)", "재현율(Recall)", "F1-Score", "평가 건수", "판정"])
+        empty_miss = pd.DataFrame(columns=["question", "gold", "pred", "confidence"])
+        return (_ts_caption("router"), "", "", empty_cls, pd.DataFrame(), empty_miss)
+    return (_ts_caption("router"), *_render_router(cached["result"]))
+
+
+def _cached_answer_outs():
+    cached = _load_bench_cache().get("answer")
+    if not cached:
+        empty_fail = pd.DataFrame(columns=["conv", "기대", "실제", "fails", "answer"])
+        return (_ts_caption("answer"), "", "", empty_fail)
+    return (_ts_caption("answer"), *_render_answer(cached["result"]))
 
 
 # ───────────────────────── 📈 개선 기록 ─────────────────────────
@@ -344,24 +393,28 @@ with gr.Blocks(title="대학교 학사 안내 에이전트") as demo:
                     answer_btn = gr.Button("1턴 답변 통과율만 채점 실행", variant="primary")
 
             gr.Markdown("#### ① 의도 분류(라우팅) 결과")
-            router_stats_out = gr.HTML()
-            router_banner_out = gr.HTML()
+            _router_init = _cached_router_outs()
+            router_ts_out = gr.Markdown(_router_init[0])
+            router_stats_out = gr.HTML(_router_init[1])
+            router_banner_out = gr.HTML(_router_init[2])
             with gr.Accordion("라우트별 세부 성능표 · 혼동 행렬 · 오분류 목록 자세히 보기", open=False):
                 gr.Markdown("**라우트별 세부 성능 평가표 (Classification Report)**")
-                cls_out = gr.Dataframe()
+                cls_out = gr.Dataframe(value=_router_init[3])
                 gr.Markdown("**혼동 행렬 (Confusion Matrix)** — 대각선이 아닌 칸은 오분류된 건수")
-                cm_out = gr.Dataframe()
+                cm_out = gr.Dataframe(value=_router_init[4])
                 gr.Markdown("**오분류 목록**")
-                miss_out = gr.Dataframe()
+                miss_out = gr.Dataframe(value=_router_init[5])
 
             gr.Markdown("#### ② 1턴 답변 결과")
-            answer_stats_out = gr.HTML()
-            answer_banner_out = gr.HTML()
+            _answer_init = _cached_answer_outs()
+            answer_ts_out = gr.Markdown(_answer_init[0])
+            answer_stats_out = gr.HTML(_answer_init[1])
+            answer_banner_out = gr.HTML(_answer_init[2])
             with gr.Accordion("실패 사례 자세히 보기", open=False):
-                fail_out = gr.Dataframe()
+                fail_out = gr.Dataframe(value=_answer_init[3])
 
-            router_outs = [router_stats_out, router_banner_out, cls_out, cm_out, miss_out]
-            answer_outs = [answer_stats_out, answer_banner_out, fail_out]
+            router_outs = [router_ts_out, router_stats_out, router_banner_out, cls_out, cm_out, miss_out]
+            answer_outs = [answer_ts_out, answer_stats_out, answer_banner_out, fail_out]
             router_btn.click(run_router_bench, inputs=None, outputs=router_outs)
             answer_btn.click(run_answer_bench, inputs=None, outputs=answer_outs)
             both_btn.click(run_router_bench, inputs=None, outputs=router_outs) \
