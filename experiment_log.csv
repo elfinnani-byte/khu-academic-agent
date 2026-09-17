@@ -1,4 +1,1 @@
-﻿round,timestamp,change_target,change_reason,change_detail,router_acc,router_macro_f1,outscope_recall,answer_pass_rate,memo
-0,2026-09-17 00:00:00,초기 상태,베이스라인 측정,fewshot 예시를 프롬프트에 실제로 주입하도록 라우터 버그 수정 완료 후 최초 측정,0.85,0.885,0.6,1.0,"기준선. 4-카테고리 성능은 양호, 범위밖 인식이 약함(0.6)"
-1,2026-09-17 00:10:00,prompts.py (ROUTE_GUIDE),범위밖 인식률(0.6)이 낮아 개선 시도,OTHER로 분류돼야 하는 예시 문장 5개를 라우팅 지침에 직접 추가,0.75,0.847,0.9,1.0,범위밖 인식은 0.6→0.9로 개선됐지만 핵심 4-카테고리 정확도가 0.85→0.75로 하락(트레이드오프) → 원복
-2,2026-09-17 16:10:38,,,,0.833,0.874,0.6,1.0,
+round,timestamp,change_target,change_reason,change_detail,router_acc,router_macro_f1,outscope_recall,answer_pass_rate,memo

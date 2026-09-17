@@ -300,7 +300,7 @@ with gr.Blocks(title="대학교 학사 안내 에이전트") as demo:
             demo.load(run_router_bench, inputs=None, outputs=router_outs)
             demo.load(run_answer_bench, inputs=None, outputs=answer_outs)
 
-        with gr.Tab("📈 개선 기록", visible=False):
+        with gr.Tab("📈 개선 기록"):
             gr.Markdown(
                 "무엇을 왜 바꿨고 수치가 어떻게 움직였는지 회차별로 남깁니다. "
                 "원칙: 평가셋은 프롬프트에 넣지 않기 · 한 번에 하나만 바꾸기 · 바뀐 것과 숫자를 같이 기록하기."
