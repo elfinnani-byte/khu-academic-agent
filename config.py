@@ -27,3 +27,13 @@ GRADIO_PORT = 7861            # 어제 실습(모두몰)의 기본 포트 7860�
 
 ROUTES = ["ENROLL_REG", "ACADEMIC_STATUS", "SCHOLARSHIP", "STUDENT_LIFE", "OTHER"]
 LABELS4 = ["ENROLL_REG", "ACADEMIC_STATUS", "SCHOLARSHIP", "STUDENT_LIFE"]
+
+# 답변 프롬프트에 노출할 사람이 읽는 카테고리 이름 — 영문 코드(ENROLL_REG 등)를 그대로 보여주면
+# 모델이 답변 속 근거 표시에 그 코드를 그대로 인용해버리는 문제가 있어 따로 둔다.
+ROUTE_LABEL_KO = {
+    "ENROLL_REG": "수강·등록",
+    "ACADEMIC_STATUS": "학적",
+    "SCHOLARSHIP": "장학·등록금",
+    "STUDENT_LIFE": "생활",
+    "OTHER": "범위밖",
+}

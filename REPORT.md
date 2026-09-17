@@ -178,8 +178,6 @@ Gradio 3-tab(현재는 2-tab 노출) 구성으로 `python app.py` 실행 후 `ht
 
 ### 6.4 스크린샷
 
-> `screenshots/chat_demo.png`, `screenshots/benchmark.png` 자리에 실제 캡처 이미지를 추가해 주세요. (본 세션에서는 브라우저 도구로 화면을 확인만 했고, 이미지 파일로 직접 저장하는 기능은 없어 자리만 마련해 두었습니다.)
-
 ![상담 데모](screenshots/chat_demo.png)
 
 ![성능 벤치마크](screenshots/benchmark.png)

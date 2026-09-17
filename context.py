@@ -9,6 +9,21 @@ from pathlib import Path
 
 GUIDE_DOCS = Path(__file__).parent / "guide_docs"
 
+# 파일명 그대로("KHU_학사운영에_관한_규정.md") 노출하면 모델이 그걸 인용해버리므로,
+# 답변에 실제로 노출될 수 있는 모든 지점(build_context, search_in_category)에서
+# 사람이 읽는 규정명으로 바꿔서 내보낸다.
+DOC_DISPLAY_NAME = {
+    "KHU_학칙.md": "학칙",
+    "KHU_학사운영에_관한_규정.md": "학사운영에 관한 규정",
+    "KHU_장학규정.md": "장학규정",
+    "KHU_교내장학금_종류_및_지급기준.md": "교내장학금 종류 및 지급기준(별표1)",
+    "KHU_학생생활규정.md": "학생생활규정",
+}
+
+
+def display_name(filename: str) -> str:
+    return DOC_DISPLAY_NAME.get(filename, filename)
+
 # "### 제25조(...)" 또는 "### 제25조의2(...)" 형태의 조문 제목을 찾는다.
 _ARTICLE_RE = re.compile(r"^###\s*제(\d+)조(?:의(\d+))?\(([^)]*)\)")
 
@@ -88,12 +103,12 @@ def build_context(category: str) -> str:
     parts = []
     for filename, article_ids in CATEGORY_ARTICLES.get(category, {}).items():
         if article_ids == ["__ALL__"]:
-            parts.append(f"## 출처: {filename}\n\n{_whole_file_text(filename)}")
+            parts.append(f"## 출처: {display_name(filename)}\n\n{_whole_file_text(filename)}")
             continue
         arts = _get_articles(filename)
         chunk = [arts[aid]["text"] for aid in article_ids if aid in arts]
         if chunk:
-            parts.append(f"## 출처: {filename}\n\n" + "\n\n".join(chunk))
+            parts.append(f"## 출처: {display_name(filename)}\n\n" + "\n\n".join(chunk))
     return "\n\n---\n\n".join(parts)
 
 
@@ -104,11 +119,11 @@ def search_in_category(category: str, keyword: str):
         if article_ids == ["__ALL__"]:
             text = _whole_file_text(filename)
             if keyword in text:
-                results.append((filename, "전체", text))
+                results.append((display_name(filename), "전체", text))
             continue
         arts = _get_articles(filename)
         for aid in article_ids:
             a = arts.get(aid)
             if a and keyword in a["text"]:
-                results.append((filename, aid, a["text"]))
+                results.append((display_name(filename), aid, a["text"]))
     return results

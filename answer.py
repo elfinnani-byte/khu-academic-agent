@@ -7,7 +7,7 @@ from langchain_core.messages import ToolMessage
 from langchain_core.tools import tool
 
 import tools as _tools
-from config import ANSWER_MODEL, MAX_TOOL_TURNS
+from config import ANSWER_MODEL, MAX_TOOL_TURNS, ROUTE_LABEL_KO
 from context import build_context
 from prompts import ANSWER_RULES
 
@@ -47,7 +47,7 @@ def answer_with_tools(question: str, route: str):
     """문의 한 줄을 답변 루프에 통과시킨다. (답변 텍스트, 호출된 도구 결과 dict) 반환."""
     model = _get_model()
     context = build_context(route)
-    system = ANSWER_RULES.format(route=route, context=context)
+    system = ANSWER_RULES.format(route_label=ROUTE_LABEL_KO.get(route, route), context=context)
     messages = [("system", system), ("human", question)]
 
     results = {}
