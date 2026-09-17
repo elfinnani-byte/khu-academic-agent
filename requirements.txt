@@ -1,0 +1,8 @@
+langgraph
+langchain
+langchain-openai
+pydantic
+pandas
+scikit-learn
+gradio
+python-dotenv

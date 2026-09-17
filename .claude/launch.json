@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "gradio-demo",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["app.py"],
+      "port": 7861
+    }
+  ]
+}

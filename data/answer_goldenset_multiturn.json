@@ -1,0 +1,84 @@
+{
+  "conversations": [
+    {"conv_id": "C01", "route": "ENROLL_REG", "turns": [
+      {"role": "customer", "text": "재수강하면 성적표에 원래 성적이 남나요?"},
+      {"role": "agent", "expect": {"action": "ANSWER", "tools": [], "must": ["R로 표시"], "forbid": ["삭제됩니다"],
+        "reference": "재수강해도 원래 취득한 성적은 성적증명서에 R로 표시되고 평점평균에는 반영되지 않습니다."}}
+    ]},
+    {"conv_id": "C02", "route": "ENROLL_REG", "turns": [
+      {"role": "customer", "text": "계절학기는 한 번에 최대 몇 학점 들을 수 있나요?"},
+      {"role": "agent", "expect": {"action": "ANSWER", "tools": [], "must": ["6학점"], "forbid": ["9학점"],
+        "reference": "계절학기는 1회 신청 시 6학점 이내로 수강할 수 있습니다."}}
+    ]},
+    {"conv_id": "C03", "route": "ENROLL_REG", "turns": [
+      {"role": "customer", "text": "졸업하려면 평균 평점이 몇 점 이상이어야 하나요?"},
+      {"role": "agent", "expect": {"action": "ANSWER", "tools": [], "must": ["1.7"], "forbid": ["2.0"],
+        "reference": "졸업하려면 전 학년 평점평균이 1.7 이상이어야 합니다."}}
+    ]},
+    {"conv_id": "C04", "route": "ENROLL_REG", "turns": [
+      {"role": "customer", "text": "학기 시작하고 15일 지나서 휴학했는데 등록금 얼마나 돌려받나요?"},
+      {"role": "agent", "expect": {"action": "ANSWER", "tools": ["get_tuition_refund_rate"], "must": ["5/6"], "forbid": ["전액"],
+        "reference": "학기 개시일로부터 15일이 지났으므로 등록금의 5/6를 반환받습니다."}}
+    ]},
+    {"conv_id": "C05", "route": "ENROLL_REG", "turns": [
+      {"role": "customer", "text": "등록금 반환 비율이 궁금해요"},
+      {"role": "agent", "expect": {"action": "ASK", "tools": [], "must": [], "forbid": [],
+        "reference": "학기 개시일로부터 며칠이 지난 시점에 신청하셨는지 알려주시겠어요? 정확한 반환 비율을 안내해 드리겠습니다."}}
+    ]},
+    {"conv_id": "C06", "route": "ACADEMIC_STATUS", "turns": [
+      {"role": "customer", "text": "일반휴학은 최대 몇 년까지 가능한가요?"},
+      {"role": "agent", "expect": {"action": "ANSWER", "tools": [], "must": ["3년", "6학기"], "forbid": ["5년"],
+        "reference": "일반휴학은 통산 3년(6학기)까지 가능합니다."}}
+    ]},
+    {"conv_id": "C07", "route": "ACADEMIC_STATUS", "turns": [
+      {"role": "customer", "text": "전과는 언제 할 수 있나요?"},
+      {"role": "agent", "expect": {"action": "ANSWER", "tools": [], "must": ["제3학기", "제5학기"], "forbid": ["1학기"],
+        "reference": "전과는 제3학기 초부터 제5학기 초에 한하여 허가받을 수 있습니다."}}
+    ]},
+    {"conv_id": "C08", "route": "ACADEMIC_STATUS", "turns": [
+      {"role": "customer", "text": "제적되면 재입학이 아예 불가능한가요?"},
+      {"role": "agent", "expect": {"action": "ANSWER", "tools": [], "must": ["재입학"], "forbid": ["절대 불가능"],
+        "reference": "사유에 따라 다르지만 재입학이 가능한 경우가 있습니다. 성적경고·유급으로 인한 제적은 1회, 그 외 사유는 최대 2회까지 재입학이 허용됩니다."}}
+    ]},
+    {"conv_id": "C09", "route": "ACADEMIC_STATUS", "turns": [
+      {"role": "customer", "text": "군입대 휴학은 언제부터 신청할 수 있나요?"},
+      {"role": "agent", "expect": {"action": "ANSWER", "tools": [], "must": ["2주일"], "forbid": ["1개월"],
+        "reference": "입영일 2주일 전부터 입영일 전일까지 신청할 수 있습니다."}}
+    ]},
+    {"conv_id": "C10", "route": "SCHOLARSHIP", "turns": [
+      {"role": "customer", "text": "성적우수장학금 받으려면 어떤 조건이 필요한가요?"},
+      {"role": "agent", "expect": {"action": "ANSWER", "tools": ["get_scholarship_info"], "must": ["학부(과)장"], "forbid": ["신청서만 내면"],
+        "reference": "직전학기 학업성적이 우수하고 품행이 단정하여 소속 학부(과)장이 추천한 자에게 지급됩니다."}}
+    ]},
+    {"conv_id": "C11", "route": "SCHOLARSHIP", "turns": [
+      {"role": "customer", "text": "장학금은 지난 학기 걸로 소급해서 신청할 수 있나요?"},
+      {"role": "agent", "expect": {"action": "ANSWER", "tools": [], "must": ["소급"], "forbid": ["소급하여 신청할 수 있습니다"],
+        "reference": "장학금은 신청자에 한하여 지급하며 소급 신청은 불가능합니다."}}
+    ]},
+    {"conv_id": "C12", "route": "SCHOLARSHIP", "turns": [
+      {"role": "customer", "text": "휴학하면 받고 있던 장학금은 어떻게 되나요?"},
+      {"role": "agent", "expect": {"action": "ANSWER", "tools": [], "must": ["취소"], "forbid": ["그대로 유지"],
+        "reference": "휴학자는 원칙적으로 해당 학기 장학금이 취소·환수됩니다. 다만 학기 개시일 21일 이내 등록휴학은 취소되지 않습니다."}}
+    ]},
+    {"conv_id": "C13", "route": "SCHOLARSHIP", "turns": [
+      {"role": "customer", "text": "저도 장학금 받을 수 있나요?"},
+      {"role": "agent", "expect": {"action": "ASK", "tools": [], "must": [], "forbid": [],
+        "reference": "어떤 장학금을 말씀하시는 건가요? 성적, 소득분위, 국가유공자 여부 등에 따라 종류가 다양해서 구체적으로 알려주시면 안내해 드리겠습니다."}}
+    ]},
+    {"conv_id": "C14", "route": "STUDENT_LIFE", "turns": [
+      {"role": "customer", "text": "동아리 만들려면 회원이 몇 명 필요한가요?"},
+      {"role": "agent", "expect": {"action": "ANSWER", "tools": [], "must": ["20인"], "forbid": ["10명"],
+        "reference": "동아리 등록에는 20인 이상의 회원 명단이 필요합니다."}}
+    ]},
+    {"conv_id": "C15", "route": "STUDENT_LIFE", "turns": [
+      {"role": "customer", "text": "학생증을 잃어버렸는데 어떻게 하나요?"},
+      {"role": "agent", "expect": {"action": "ANSWER", "tools": [], "must": ["재발급"], "forbid": [],
+        "reference": "학생지원센터에 재발급 신청서를 작성하고 소정의 수수료를 납부하면 재발급받을 수 있습니다."}}
+    ]},
+    {"conv_id": "C16", "route": "STUDENT_LIFE", "turns": [
+      {"role": "customer", "text": "동아리 임원이 되려면 조건이 있나요?"},
+      {"role": "agent", "expect": {"action": "ANSWER", "tools": [], "must": ["유기정학"], "forbid": [],
+        "reference": "선출일 기준 재학생으로서 형사처벌 또는 유기정학 이상의 징계를 받은 사실이 없어야 합니다."}}
+    ]}
+  ]
+}
