@@ -378,21 +378,19 @@ def _fmt_answer_cell(rate, prev_rate):
     return f"{rate_disp}<br>{n_pass}/{ANSWER_N}건"
 
 
-def _fmt_memo_cell(acc, outscope_recall, memo, is_baseline):
-    """오분류 건수·범위밖 인식 건수를 자동 계산해 메모(답변 탈락 사유 요약 등) 앞에 붙인다.
-    베이스라인(첫 회차)은 비교 대상이 없어 이 자동 요약을 붙이지 않고 메모만 그대로 보여준다."""
-    memo_text = _safe_str(memo)
-    if is_baseline:
-        return memo_text
+def _fmt_memo_cell(acc, outscope_recall, memo):
+    """자유 메모(있으면 1줄)와 오분류 건수·범위밖 인식 건수 자동 요약(2줄)을 함께 보여준다.
+    모든 회차(베이스라인 포함)에 항상 자동 요약을 붙인다 — 지우는 건 옛 설명 문장뿐이어야 한다."""
     parts = []
     if not pd.isna(acc):
         parts.append(f"오분류 {round((1 - acc) * EVAL_N)}건")
     if not pd.isna(outscope_recall):
         parts.append(f"범위밖 인식 {round(outscope_recall * OUTSCOPE_N)}/{OUTSCOPE_N}건({100 * outscope_recall:.1f}%)")
-    prefix = " · ".join(parts)
-    if prefix and memo_text != "-":
-        return f"{prefix} — {memo_text}"
-    return prefix or memo_text
+    auto_line = " · ".join(parts)
+    memo_text = _safe_str(memo)
+    if memo_text != "-" and auto_line:
+        return f"{memo_text}<br>{auto_line}"
+    return auto_line or memo_text
 
 
 def _log_display_df(log):
@@ -412,7 +410,7 @@ def _log_display_df(log):
             "변경내용(What)": _safe_str(r.get("change_detail")),
             "의도 분류 정확도": _fmt_router_cell(r["router_acc"], r["router_macro_f1"], prev_acc),
             "답변 통과율": _fmt_answer_cell(r["answer_pass_rate"], prev_rate),
-            "성과 및 오답 메모": _fmt_memo_cell(r["router_acc"], r["outscope_recall"], r.get("memo"), prev is None),
+            "성과 및 오답 메모": _fmt_memo_cell(r["router_acc"], r["outscope_recall"], r.get("memo")),
         })
     return pd.DataFrame(rows, columns=LOG_DISPLAY_COLUMNS)
 
@@ -584,7 +582,7 @@ with gr.Blocks(title="대학교 학사 안내 에이전트") as demo:
             refresh_btn = gr.Button("표 새로고침")
             log_table = gr.Dataframe(value=_log_display_df(_load_log()), wrap=True, buttons=[], elem_classes="fit-table",
                                       column_widths=["6%", "14%", "18%", "18%", "16%", "14%", "14%"],
-                                      datatype=["str", "str", "str", "str", "html", "html", "str"])
+                                      datatype=["str", "str", "str", "str", "html", "html", "html"])
 
             refresh_btn.click(refresh_log, outputs=log_table)
 
