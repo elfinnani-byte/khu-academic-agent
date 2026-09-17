@@ -18,6 +18,7 @@ DOC_DISPLAY_NAME = {
     "KHU_장학규정.md": "장학규정",
     "KHU_교내장학금_종류_및_지급기준.md": "교내장학금 종류 및 지급기준(별표1)",
     "KHU_학생생활규정.md": "학생생활규정",
+    "KHU_학생상벌에관한규정.md": "학생상벌에관한규정",
 }
 
 
@@ -59,6 +60,7 @@ CATEGORY_ARTICLES = {
     },
     "STUDENT_LIFE": {
         "KHU_학생생활규정.md": [str(i) for i in range(1, 21)],
+        "KHU_학생상벌에관한규정.md": [str(i) for i in range(1, 22)],
     },
 }
 
