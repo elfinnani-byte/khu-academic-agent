@@ -15,7 +15,7 @@ import pandas as pd
 
 import evaluate as ev
 from agent import chat_app
-from config import GRADIO_PORT, LABELS4
+from config import GRADIO_PORT, LABELS4, ROUTE_LABEL_KO, ROUTES
 from prompts import ANSWER_RULES, ROUTE_GUIDE
 
 LOG_PATH = Path(__file__).parent / "experiment_log.csv"
@@ -133,26 +133,65 @@ def _banner(n_bad, n_total, unit="문항", detail_note="아래 표에서 확인�
             f'{detail_note}</div>')
 
 
+def _route_disp(code):
+    """라우트 코드를 사람이 바로 알아볼 수 있게 'CODE (한글)' 형태로 바꾼다."""
+    ko = ROUTE_LABEL_KO.get(code)
+    return f"{code} ({ko})" if ko else code
+
+
 def _cls_report_df(cls_report, labels):
     rows = []
     for lbl in labels:
         d = cls_report[lbl]
-        rows.append([lbl, f"{d['precision']:.3f}", f"{d['recall']:.3f}", f"{d['f1-score']:.3f}", int(d["support"]),
-                     "✅ 만점" if d["f1-score"] >= 0.999 else f"{d['f1-score'] * 100:.0f}%"])
+        rows.append([_route_disp(lbl), f"{d['precision']:.3f}", f"{d['recall']:.3f}", f"{d['f1-score']:.3f}",
+                     int(d["support"]), "✅ 만점" if d["f1-score"] >= 0.999 else f"{d['f1-score'] * 100:.0f}%"])
     ma = cls_report["macro avg"]
     rows.append(["단순 평균 (Macro Avg)", f"{ma['precision']:.3f}", f"{ma['recall']:.3f}", f"{ma['f1-score']:.3f}",
                  int(ma["support"]), "-"])
     return pd.DataFrame(rows, columns=["라우트", "정밀도(Precision)", "재현율(Recall)", "F1-Score", "평가 건수", "판정"])
 
 
-def _cm_df(cm_list, labels):
-    cm = pd.DataFrame(cm_list, index=labels, columns=labels)
+def _cm_cell_html(val, bg, color, weight=600):
+    return (f'<div style="background:{bg};color:{color};font-weight:{weight};'
+            f'padding:3px 6px;border-radius:4px;text-align:center;">{val}</div>')
+
+
+def _cm_df(cm_list, row_labels, col_labels):
+    """대각선(정답 적중)은 초록, 대각선 밖의 0보다 큰 칸(오분류)은 빨강으로 배경을 칠해서
+    표만 훑어봐도 어디서 헷갈렸는지 바로 보이게 한다. 열에는 OTHER(범위밖)까지 포함돼서
+    "실제로는 답할 수 있었는데 범위밖으로 잘못 넘긴" 오분류도 빠짐없이 잡힌다.
+
+    gr.Dataframe에 pandas Styler를 넘겨도 이 Gradio 버전에서는 배경색이 실제로 렌더링되지
+    않아(직접 확인함), 각 셀 값을 인라인 스타일이 적용된 HTML 문자열로 미리 만들어
+    datatype="html" 컬럼에 넣는 방식으로 우회한다.
+    """
+    disp_rows = [_route_disp(l) for l in row_labels]
+    disp_cols = [_route_disp(l) for l in col_labels]
+    cm = pd.DataFrame(cm_list, index=disp_rows, columns=disp_cols)
     cm["정답 합계"] = cm.sum(axis=1)
     total = cm.sum(axis=0)
     total.name = "예측 합계"
     cm = pd.concat([cm, total.to_frame().T])
     cm.insert(0, "실제 정답 \\ 예측", cm.index)
-    return cm.reset_index(drop=True)
+    cm = cm.reset_index(drop=True).astype(object)  # 셀에 HTML 문자열을 넣을 것이므로 숫자 dtype을 풀어둔다
+
+    label_col = "실제 정답 \\ 예측"
+    data_cols = [c for c in cm.columns if c != label_col]
+
+    for i in cm.index:
+        row_label = cm.loc[i, label_col]
+        is_total_row = row_label == "예측 합계"
+        for col in data_cols:
+            val = cm.loc[i, col]
+            if is_total_row or col == "정답 합계":
+                cm.loc[i, col] = _cm_cell_html(val, "#f4f4f7", "#555")
+            elif col == row_label:
+                cm.loc[i, col] = _cm_cell_html(val, "#d9f5e3", "#1e5631", 700)
+            elif val:
+                cm.loc[i, col] = _cm_cell_html(val, "#fdeaea", "#7a1f1f")
+            else:
+                cm.loc[i, col] = _cm_cell_html(val, "transparent", "inherit", 400)
+    return cm
 
 
 # 마지막 측정 결과를 디스크에 남겨서, 서버를 재시작하거나 페이지를 새로고침해도
@@ -172,9 +211,16 @@ def _save_bench_cache(key, result):
     BENCH_CACHE_PATH.write_text(json.dumps(cache, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+SECTION_TITLES = {"router": "① 의도 분류(라우팅) 결과", "answer": "② 1턴 답변 결과"}
+
+
 def _ts_caption(key):
+    """제목과 '마지막 측정' 시각을 한 줄로 합친다 — 시각 부분만 옅은 글씨로 작게 표시."""
     entry = _load_bench_cache().get(key)
-    return f"🕒 마지막 측정: {entry['measured_at']}" if entry else "_아직 측정한 기록이 없습니다._"
+    ts = f"🕒 마지막 측정: {entry['measured_at']}" if entry else "아직 측정한 기록이 없습니다."
+    note = (f"<span style='font-size:0.75em;font-weight:400;"
+            f"color:var(--body-text-color-subdued);margin-left:10px;'>{ts}</span>")
+    return f"#### {SECTION_TITLES[key]} {note}"
 
 
 def _render_router(r):
@@ -195,8 +241,9 @@ def _render_router(r):
     stats_html = _stat_cards(cards)
     banner_html = _banner(n_miss, n, unit="건", detail_note="아래 '오분류 목록'에서 확인하세요.")
     cls_df = _cls_report_df(r["classification_report"], LABELS4)
-    cm_df = _cm_df(r["confusion_matrix"], LABELS4)
-    miss_df = pd.DataFrame(miss, columns=["question", "gold", "pred", "confidence"]) if miss else \
+    cm_df = _cm_df(r["confusion_matrix"], LABELS4, r.get("cm_col_labels", ROUTES))
+    miss_disp = [{**m, "gold": _route_disp(m["gold"]), "pred": _route_disp(m["pred"])} for m in miss]
+    miss_df = pd.DataFrame(miss_disp, columns=["question", "gold", "pred", "confidence"]) if miss_disp else \
         pd.DataFrame(columns=["question", "gold", "pred", "confidence"])
     return stats_html, banner_html, cls_df, cm_df, miss_df
 
@@ -407,29 +454,32 @@ with gr.Blocks(title="대학교 학사 안내 에이전트") as demo:
                 with gr.Column():
                     answer_btn = gr.Button("② 1턴 답변 통과율만 채점 실행 (골든셋 16건)", variant="primary")
 
-            gr.Markdown("#### ① 의도 분류(라우팅) 결과")
             _router_init = _cached_router_outs()
-            router_ts_out = gr.Markdown(_router_init[0])
+            router_ts_out = gr.Markdown(_router_init[0], elem_classes="section-heading")
             router_stats_out = gr.HTML(_router_init[1])
             router_banner_out = gr.HTML(_router_init[2])
             with gr.Accordion("라우트별 세부 성능표 · 혼동 행렬 · 오분류 목록 자세히 보기", open=False):
                 with gr.Group():
                     gr.Markdown("**라우트별 세부 성능 평가표 (Classification Report)**")
-                    cls_out = gr.Dataframe(value=_router_init[3])
+                    cls_out = gr.Dataframe(value=_router_init[3], buttons=[], wrap=True)
                 with gr.Group():
-                    gr.Markdown("**혼동 행렬 (Confusion Matrix)** — 대각선이 아닌 칸은 오분류된 건수")
-                    cm_out = gr.Dataframe(value=_router_init[4])
+                    gr.Markdown(
+                        "**혼동 행렬 (Confusion Matrix)** — 행(실제 정답) → 열(모델 예측)\n\n"
+                        "🟩 초록 칸(대각선) = 예측이 적중한 건수 · 🟥 빨강 칸 = 오분류된 건수(0보다 큰 칸만 강조) · "
+                        "회색 칸 = 합계. 열에 OTHER(범위밖)도 포함돼 있어, 실제로는 답할 수 있었는데 "
+                        "범위밖으로 잘못 넘긴 오분류도 여기서 확인됩니다(정답 합계가 15가 안 되면 이 경우입니다)."
+                    )
+                    cm_out = gr.Dataframe(value=_router_init[4], buttons=[], wrap=True, datatype="html")
                 with gr.Group():
                     gr.Markdown("**오분류 목록**")
-                    miss_out = gr.Dataframe(value=_router_init[5])
+                    miss_out = gr.Dataframe(value=_router_init[5], buttons=[], wrap=True)
 
-            gr.Markdown("#### ② 1턴 답변 결과")
             _answer_init = _cached_answer_outs()
-            answer_ts_out = gr.Markdown(_answer_init[0])
+            answer_ts_out = gr.Markdown(_answer_init[0], elem_classes="section-heading")
             answer_stats_out = gr.HTML(_answer_init[1])
             answer_banner_out = gr.HTML(_answer_init[2])
             with gr.Accordion("실패 사례 자세히 보기", open=False):
-                fail_out = gr.Dataframe(value=_answer_init[3])
+                fail_out = gr.Dataframe(value=_answer_init[3], buttons=[], wrap=True)
 
             router_outs = [router_ts_out, router_stats_out, router_banner_out, cls_out, cm_out, miss_out]
             answer_outs = [answer_ts_out, answer_stats_out, answer_banner_out, fail_out]
@@ -446,7 +496,7 @@ with gr.Blocks(title="대학교 학사 안내 에이전트") as demo:
                 "회차는 성능 벤치마크 탭에서 측정한 뒤 여기에 추가되며, 이 탭 자체에는 입력칸이 없습니다."
             )
             refresh_btn = gr.Button("표 새로고침")
-            log_table = gr.Dataframe(value=_log_display_df(_load_log()), wrap=True)
+            log_table = gr.Dataframe(value=_log_display_df(_load_log()), wrap=True, buttons=[])
 
             refresh_btn.click(refresh_log, outputs=log_table)
 
@@ -476,6 +526,10 @@ INSPECTOR_CSS = """
     overflow-wrap: anywhere;
     overflow-x: hidden !important;
 }
+.section-heading, .section-heading > div {
+    overflow: visible !important;
+}
+.section-heading h4 { margin: 0; }
 """
 
 if __name__ == "__main__":

@@ -18,7 +18,7 @@ import pandas as pd
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, f1_score
 
 from common import pmap
-from config import BASE, LABELS4, WORKERS
+from config import BASE, LABELS4, ROUTES, WORKERS
 
 
 # --- ① 의도 분류 ---
@@ -47,11 +47,13 @@ def eval_router(report=True, sample=None):
     if report:
         cls_report = classification_report(y, pred, labels=LABELS4, digits=3,
                                             zero_division=0, output_dict=True)
-        cm = confusion_matrix(y, pred, labels=LABELS4)
+        # 열은 ROUTES(=LABELS4+OTHER) 전체로 잡는다 - 안 그러면 실제로는 답할 수 있었는데
+        # OTHER로 잘못 넘긴 오분류가 4x4 행렬 밖으로 빠져나가 합계가 안 맞아 보인다.
+        cm = confusion_matrix(y, pred, labels=ROUTES)[:len(LABELS4), :]
         print()
         print(classification_report(y, pred, labels=LABELS4, digits=3, zero_division=0))
         print("[혼동 행렬] 행=정답, 열=예측")
-        print(pd.DataFrame(cm, index=LABELS4, columns=LABELS4).to_string())
+        print(pd.DataFrame(cm, index=LABELS4, columns=ROUTES).to_string())
 
         miss = [(q, g, p, s["confidence"]) for q, g, p, s in
                 zip(ev["question"], y, pred, states) if g != p]
@@ -60,7 +62,7 @@ def eval_router(report=True, sample=None):
             print(f"  [{g} → {p}] conf={conf:.2f}  {q[:56]}")
 
         result.update({
-            "labels": LABELS4, "confusion_matrix": cm.tolist(),
+            "labels": LABELS4, "cm_col_labels": ROUTES, "confusion_matrix": cm.tolist(),
             "classification_report": cls_report,
             "misclassified": [{"question": q, "gold": g, "pred": p, "confidence": s["confidence"]}
                               for q, g, p, s in zip(ev["question"], y, pred, states) if g != p],
