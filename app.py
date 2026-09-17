@@ -403,11 +403,9 @@ with gr.Blocks(title="대학교 학사 안내 에이전트") as demo:
             both_btn = gr.Button("①+② 전체 재측정 (라우팅 + 답변 동시)", variant="secondary")
             with gr.Row():
                 with gr.Column():
-                    gr.Markdown("**① 의도 분류(라우팅) 성능** — eval 60건 + outscope 20건 전체")
-                    router_btn = gr.Button("의도 분류만 채점 실행", variant="primary")
+                    router_btn = gr.Button("① 의도 분류만 채점 실행 (eval 60건 + outscope 20건)", variant="primary")
                 with gr.Column():
-                    gr.Markdown("**② 1턴 답변 성능** — 골든셋 16건 전체")
-                    answer_btn = gr.Button("1턴 답변 통과율만 채점 실행", variant="primary")
+                    answer_btn = gr.Button("② 1턴 답변 통과율만 채점 실행 (골든셋 16건)", variant="primary")
 
             gr.Markdown("#### ① 의도 분류(라우팅) 결과")
             _router_init = _cached_router_outs()
