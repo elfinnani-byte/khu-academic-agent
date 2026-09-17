@@ -1,1 +1,2 @@
-round,timestamp,change_target,change_reason,change_detail,router_acc,router_macro_f1,outscope_recall,answer_pass_rate,memo
+﻿round,timestamp,change_target,change_reason,change_detail,router_acc,router_macro_f1,outscope_recall,answer_pass_rate,memo
+0,2026-09-17 17:34:08,초기 상태(코드 수정 없음),베이스라인 측정,,0.883,0.906,0.55,1.0,실험 기록 초기화 후 최초 측정

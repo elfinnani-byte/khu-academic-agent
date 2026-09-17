@@ -191,6 +191,14 @@ def refresh_log():
     return _load_log()
 
 
+def _run_metrics(sample):
+    """개선 기록 한 회차를 남길 때 두 지표를 한 번에 다시 잰다."""
+    sample = int(sample) if sample else None
+    r_router = ev.eval_router(report=False, sample=sample)
+    r_answer = ev.eval_answer(report=False, sample=sample)
+    return r_router, r_answer
+
+
 def add_log_entry(change_target, change_reason, change_detail, memo, sample):
     r_router, r_answer = _run_metrics(sample)
     log = _load_log()
