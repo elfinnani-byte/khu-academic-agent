@@ -151,6 +151,18 @@ def _cls_report_df(cls_report, labels):
     return pd.DataFrame(rows, columns=["라우트", "정밀도(Precision)", "재현율(Recall)", "F1-Score", "평가 건수", "판정"])
 
 
+FIRST_COL_WIDTH = "200px"
+
+
+def _table_col_widths(df):
+    """1열(라우트 이름)은 표들끼리 폭을 맞추고, 나머지 열은 균등 폭으로 나눈다."""
+    n_data_cols = len(df.columns) - 1
+    if n_data_cols <= 0:
+        return None
+    share = round(100 / n_data_cols, 2)
+    return [FIRST_COL_WIDTH] + [f"{share}%"] * n_data_cols
+
+
 def _cm_cell_html(val, bg, color, weight=600):
     return (f'<div style="background:{bg};color:{color};font-weight:{weight};'
             f'padding:3px 6px;border-radius:4px;text-align:center;">{val}</div>')
@@ -165,9 +177,8 @@ def _cm_df(cm_list, row_labels, col_labels):
     않아(직접 확인함), 각 셀 값을 인라인 스타일이 적용된 HTML 문자열로 미리 만들어
     datatype="html" 컬럼에 넣는 방식으로 우회한다.
     """
-    disp_rows = [_route_disp(l) for l in row_labels]
     disp_cols = [_route_disp(l) for l in col_labels]
-    cm = pd.DataFrame(cm_list, index=disp_rows, columns=disp_cols)
+    cm = pd.DataFrame(cm_list, index=list(row_labels), columns=disp_cols)  # 행 제목은 코드 그대로(한글 없이)
     cm["정답 합계"] = cm.sum(axis=1)
     total = cm.sum(axis=0)
     total.name = "예측 합계"
@@ -177,15 +188,17 @@ def _cm_df(cm_list, row_labels, col_labels):
 
     label_col = "실제 정답 \\ 예측"
     data_cols = [c for c in cm.columns if c != label_col]
+    disp_by_code = {code: _route_disp(code) for code in col_labels}
 
     for i in cm.index:
-        row_label = cm.loc[i, label_col]
+        row_label = cm.loc[i, label_col]  # 코드 원문이거나 "예측 합계"
         is_total_row = row_label == "예측 합계"
+        row_disp = disp_by_code.get(row_label)  # 대각선 판정은 한글이 붙은 열 이름과 맞춰봐야 한다
         for col in data_cols:
             val = cm.loc[i, col]
             if is_total_row or col == "정답 합계":
                 cm.loc[i, col] = _cm_cell_html(val, "#f4f4f7", "#555")
-            elif col == row_label:
+            elif col == row_disp:
                 cm.loc[i, col] = _cm_cell_html(val, "#d9f5e3", "#1e5631", 700)
             elif val:
                 cm.loc[i, col] = _cm_cell_html(val, "#fdeaea", "#7a1f1f")
@@ -461,15 +474,15 @@ with gr.Blocks(title="대학교 학사 안내 에이전트") as demo:
             with gr.Accordion("라우트별 세부 성능표 · 혼동 행렬 · 오분류 목록 자세히 보기", open=False):
                 with gr.Group():
                     gr.Markdown("**라우트별 세부 성능 평가표 (Classification Report)**")
-                    cls_out = gr.Dataframe(value=_router_init[3], buttons=[], wrap=True)
+                    cls_out = gr.Dataframe(value=_router_init[3], buttons=[], wrap=True,
+                                            column_widths=_table_col_widths(_router_init[3]))
                 with gr.Group():
                     gr.Markdown(
                         "**혼동 행렬 (Confusion Matrix)** — 행(실제 정답) → 열(모델 예측)\n\n"
-                        "🟩 초록 칸(대각선) = 예측이 적중한 건수 · 🟥 빨강 칸 = 오분류된 건수(0보다 큰 칸만 강조) · "
-                        "회색 칸 = 합계. 열에 OTHER(범위밖)도 포함돼 있어, 실제로는 답할 수 있었는데 "
-                        "범위밖으로 잘못 넘긴 오분류도 여기서 확인됩니다(정답 합계가 15가 안 되면 이 경우입니다)."
+                        "🟩 초록 칸(대각선) = 예측이 적중한 건수 · 🟥 빨강 칸 = 오분류된 건수(0보다 큰 칸만 강조)"
                     )
-                    cm_out = gr.Dataframe(value=_router_init[4], buttons=[], wrap=True, datatype="html")
+                    cm_out = gr.Dataframe(value=_router_init[4], buttons=[], wrap=True, datatype="html",
+                                           column_widths=_table_col_widths(_router_init[4]))
                 with gr.Group():
                     gr.Markdown("**오분류 목록**")
                     miss_out = gr.Dataframe(value=_router_init[5], buttons=[], wrap=True)
