@@ -25,7 +25,7 @@ _POLICY_DOC_TEXT = (Path(__file__).parent / "data" / "policy_academic.md").read_
 
 ROUTE_LABEL = {
     "ENROLL_REG": "📘 수강·등록",
-    "ACADEMIC_STATUS": "🎓 학적",
+    "ACADEMIC_STATUS": "🪪 학적",
     "SCHOLARSHIP": "💰 장학·등록금",
     "STUDENT_LIFE": "🏫 생활",
     "OTHER": "❓ 범위밖",
@@ -110,7 +110,7 @@ def _banner(n_bad, n_total, unit="문항"):
         return ""
     if n_bad == 0:
         return (f'<div style="background:#e8f9ee;border:1px solid #b7e4c7;border-radius:10px;padding:12px;'
-                f'text-align:center;font-weight:600;color:#1e5631;">🎉 오류 0건 — {n_total}{unit} 전수 통과했습니다.</div>')
+                f'text-align:center;font-weight:600;color:#1e5631;">✅ 오류 0건 — {n_total}{unit} 전수 통과했습니다.</div>')
     return (f'<div style="background:#fdeaea;border:1px solid #f3b7b7;border-radius:10px;padding:12px;'
             f'text-align:center;font-weight:600;color:#7a1f1f;">⚠️ {n_bad}건 실패 / {n_total}{unit} — '
             f'아래 표에서 실패 사례를 확인하세요.</div>')
@@ -268,7 +268,10 @@ def add_log_entry(change_target, change_reason, change_detail, memo, sample):
     return log, status
 
 
-THEME = gr.themes.Soft(primary_hue="indigo", secondary_hue="slate")
+THEME = gr.themes.Soft(
+    primary_hue="indigo", secondary_hue="slate",
+    font=[gr.themes.GoogleFont("Noto Sans KR"), "ui-sans-serif", "system-ui", "sans-serif"],
+)
 
 with gr.Blocks(title="대학교 학사 안내 에이전트") as demo:
     gr.Markdown(
@@ -278,6 +281,11 @@ with gr.Blocks(title="대학교 학사 안내 에이전트") as demo:
 
     with gr.Tabs():
         with gr.Tab("💬 상담 데모"):
+            gr.Markdown(
+                "### 실시간 상담 데모\n"
+                "질문을 입력하면 답변과 함께, 에이전트가 내부적으로 어떤 판단을 했는지(분류·확신도·가드레일 등)를 "
+                "오른쪽 패널에서 그대로 확인할 수 있습니다."
+            )
             thread_state = gr.State("")
             with gr.Row():
                 with gr.Column(scale=3):
@@ -289,7 +297,7 @@ with gr.Blocks(title="대학교 학사 안내 에이전트") as demo:
                         reset_btn = gr.Button("대화 새로 시작")
                     gr.Examples(examples=EXAMPLES, inputs=q, label="추천 질문 바로 해보기")
                 with gr.Column(scale=2):
-                    gr.Markdown("**에이전트 내부 관제**")
+                    gr.Markdown("#### 에이전트 내부 관제")
                     with gr.Row():
                         gr.Markdown("분류 라우트", elem_classes="ins-label")
                         route_out = gr.Textbox(show_label=False, container=False, interactive=False, scale=2)
