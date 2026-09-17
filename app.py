@@ -489,7 +489,8 @@ with gr.Blocks(title="대학교 학사 안내 에이전트") as demo:
                                            elem_classes="fit-table")
                 with gr.Group():
                     gr.Markdown("**오분류 목록**")
-                    miss_out = gr.Dataframe(value=_router_init[5], buttons=[], wrap=True, elem_classes="fit-table")
+                    miss_out = gr.Dataframe(value=_router_init[5], buttons=[], wrap=True, elem_classes="fit-table",
+                                             column_widths=["52%", "16%", "16%", "16%"])
 
             _answer_init = _cached_answer_outs()
             answer_ts_out = gr.Markdown(_answer_init[0], elem_classes="section-heading")
